@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFile } from "node:fs/promises";
 import sharp from "sharp";
-import { processImage } from "@/lib/storage/process";
+import { processImage, toShareableJpeg } from "@/lib/storage/process";
 
 /**
  * The formats phones actually produce. HEIC matters most — it is the iPhone
@@ -80,5 +80,18 @@ describe("image processing", () => {
 
   it("rejects a file that isn't an image at all", async () => {
     await expect(processImage(Buffer.from("this is not an image"))).rejects.toThrow();
+  });
+});
+
+describe("share encoding", () => {
+  it("turns the WebP display copy into JPEG at the same size", async () => {
+    const { display } = await processImage(await makeImage("jpeg", 3200, 2400));
+    const shared = await toShareableJpeg(display.buffer);
+
+    // WhatsApp would treat WebP as a sticker; JPEG is what every target takes.
+    const metadata = await sharp(shared).metadata();
+    expect(metadata.format).toBe("jpeg");
+    expect(metadata.width).toBe(2560);
+    expect(metadata.height).toBe(1920);
   });
 });

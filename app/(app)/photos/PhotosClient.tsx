@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState, useTransition } from "react";
+import { useCallback, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import { deletePhoto } from "./actions";
@@ -40,6 +40,11 @@ export function PhotosClient({
   const [uploads, setUploads] = useState<UploadState[]>([]);
   const [lightboxId, setLightboxId] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [isSharing, setIsSharing] = useState(false);
+  const sharePrefetch = useRef<{ id: string; file: Promise<File> } | null>(null);
+  // False during SSR, so the button appears only once hydration has asked the
+  // browser — no markup mismatch.
+  const canShareFiles = useSyncExternalStore(subscribeNever, supportsFileSharing, () => false);
 
   const setStage = useCallback(
     (key: string, stage: UploadState["stage"], message?: string) => {
@@ -108,6 +113,44 @@ export function PhotosClient({
     },
     [router, setStage],
   );
+
+  /**
+   * Fetch the shareable JPEG, reusing the copy started when the lightbox
+   * opened. iOS drops the user gesture across a real network round trip, so by
+   * the time Share is tapped these bytes should already be in hand.
+   */
+  const shareFileFor = useCallback((photo: PhotoCardData): Promise<File> => {
+    const cached = sharePrefetch.current;
+    if (cached?.id === photo.id) return cached.file;
+
+    const file = fetch(`/api/photos/${photo.id}/share`).then(async (response) => {
+      if (!response.ok) throw new Error("Share bytes unavailable");
+      const base = photo.originalFilename.replace(/\.[^.]+$/, "") || "photo";
+      return new File([await response.blob()], `${base}.jpg`, { type: "image/jpeg" });
+    });
+    void file.catch(() => {}); // a prefetch nobody shares must not go unhandled
+    sharePrefetch.current = { id: photo.id, file };
+    return file;
+  }, []);
+
+  function openLightbox(photo: PhotoCardData) {
+    setLightboxId(photo.id);
+    if (canShareFiles) void shareFileFor(photo);
+  }
+
+  async function share(photo: PhotoCardData) {
+    setIsSharing(true);
+    try {
+      await navigator.share({ files: [await shareFileFor(photo)] });
+    } catch (error) {
+      // Dismissing the share sheet is an AbortError, not a failure.
+      if ((error as Error)?.name === "AbortError") return;
+      sharePrefetch.current = null;
+      toast("Couldn't share that photo.", "error");
+    } finally {
+      setIsSharing(false);
+    }
+  }
 
   async function onFilesChosen(event: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
@@ -209,7 +252,7 @@ export function PhotosClient({
               {photo.thumbnailUrl ? (
                 <button
                   type="button"
-                  onClick={() => setLightboxId(photo.id)}
+                  onClick={() => openLightbox(photo)}
                   className="group h-full w-full overflow-hidden rounded-lg bg-subtle"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -270,6 +313,16 @@ export function PhotosClient({
           </div>
 
           <div className="flex flex-wrap gap-2 p-3 safe-bottom">
+            {canShareFiles ? (
+              <button
+                type="button"
+                onClick={() => share(lightboxPhoto)}
+                disabled={isSharing}
+                className="tap w-full rounded-xl bg-white px-4 py-3 text-center text-xs font-extrabold tracking-tight text-ink transition-opacity disabled:opacity-60"
+              >
+                {isSharing ? "Preparing…" : "Share photo"}
+              </button>
+            ) : null}
             <a
               href={`/api/photos/${lightboxPhoto.id}/download?variant=display`}
               className="tap flex-1 rounded-xl bg-white/12 px-4 py-3 text-center text-xs font-extrabold tracking-tight text-white transition-colors hover:bg-white/20"
@@ -315,6 +368,29 @@ export function PhotosClient({
       ) : null}
     </>
   );
+}
+
+const subscribeNever = () => () => {};
+
+/**
+ * Can this browser hand a file to the OS share sheet? Sharing the *file* is
+ * what puts the photo into WhatsApp or Messages — a link to this app would be
+ * useless outside the family. Most desktop browsers can't, so the button is
+ * hidden there. The answer can't change for the life of the page, so it is
+ * asked once.
+ */
+let fileSharingSupport: boolean | undefined;
+function supportsFileSharing(): boolean {
+  if (fileSharingSupport === undefined) {
+    try {
+      const probe = new File([new Uint8Array(1)], "probe.jpg", { type: "image/jpeg" });
+      fileSharingSupport =
+        typeof navigator.share === "function" && Boolean(navigator.canShare?.({ files: [probe] }));
+    } catch {
+      fileSharingSupport = false;
+    }
+  }
+  return fileSharingSupport;
 }
 
 function guessContentType(filename: string): string {

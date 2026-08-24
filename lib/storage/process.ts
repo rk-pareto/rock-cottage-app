@@ -13,6 +13,7 @@ const DISPLAY_MAX_EDGE = 2560;
 const DISPLAY_QUALITY = 85;
 const THUMBNAIL_MAX_EDGE = 640;
 const THUMBNAIL_QUALITY = 78;
+const SHARE_QUALITY = 88;
 
 /**
  * Full-resolution decodes are memory-hungry and a phone can fire several
@@ -136,4 +137,17 @@ export function processImage(original: Buffer): Promise<ProcessedImage> {
       );
     }
   });
+}
+
+/**
+ * Re-encode a stored derivative as JPEG for the share sheet.
+ *
+ * The display copy is WebP, which WhatsApp treats as a sticker and older
+ * SMS/MMS clients refuse outright, so the bytes handed to `navigator.share()`
+ * are always JPEG.
+ */
+export function toShareableJpeg(image: Buffer): Promise<Buffer> {
+  return withConcurrencyLimit(() =>
+    sharp(image, { failOn: "none" }).jpeg({ quality: SHARE_QUALITY }).toBuffer(),
+  );
 }
