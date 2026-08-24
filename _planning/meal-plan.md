@@ -13,17 +13,17 @@
 | **Wed** Sep 2 | Eggs, toast, fruit | Hot dogs + raw veg | **Pulled pork** + burrito-bowl sides + coleslaw |
 | **Thu** Sep 3 | Waffles, bacon, fruit | Sloppy Joes + coleslaw | Chicken skewers, greek salad, lemon potatoes |
 | **Fri** Sep 4 | **Egg bake** + yogurt & granola | Beef shishkabobs | Burgers, fries, salad |
-| **Sat** Sep 5 | DIY | **Chicken salad** | Garlic shrimp + sesame soba noodles |
+| **Sat** Sep 5 | DIY | **Chicken salad** (pre-made, bring) | Garlic shrimp + sesame soba noodles (Dana & Sean) |
 | **Sun** Sep 6 (depart) | DIY | Leftovers | — |
 
-**Who cooks (from spreadsheet):** Dana & Sean cover most dinners + Tue/Wed/Thu breakfasts. Ryan brings chili + pulled pork. DIY days = everyone.
+**Who cooks (from spreadsheet):** Dana & Sean cover most dinners + Tue/Wed/Thu breakfasts. Ryan brings chili + pulled pork + sloppy Joes + chicken salad (all pre-made). DIY days = everyone.
 
 ---
 
 ## Groceries — per meal (for review)
 
 ### Mon — Chili (Dinner) · Ryan brings pre-made
-- Chili (Ryan makes ahead & brings) — double batch for 8-9
+- **Chili (pre-made, bring)** — double batch for 8-9
 - Optional toppers: shredded cheddar, sour cream
 - Bread or cornbread for dipping (optional)
 
@@ -59,13 +59,13 @@
 - Raw veggie tray (carrots, celery, peppers, cherry tomatoes)
 
 ### Wed — Dinner: Pulled pork + burrito-bowl sides · Ryan
-- **Pulled pork shoulder (~5-6 lb)** — Ryan, made ahead & brought **frozen**
+- **Pulled pork (~5-6 lb)** — Ryan, pre-made & brought **frozen**
 - White rice (~2 cups dry)
 - Beans (black beans, 2 cans)
 - Salsa (1-2 jars)
 - Sour cream (1 tub)
 - Shredded cheese (cheddar, ~1 lb)
-- **ADD coleslaw** (cabbage) — the crunch/veg for this meal (make a coleslaw on-site; extra cabbage = the vegetable)
+- **Coleslaw** (cabbage) — make on-site; the crunch/veg for this meal
 - Optional: corn, avocado, tortilla chips
 
 ### Thu — Breakfast: Waffles, bacon, fruit · Dana & Sean
@@ -74,11 +74,9 @@
 - Maple syrup
 - Fresh fruit
 
-### Thu — Lunch: Sloppy Joes + coleslaw
-- Ground beef (~2 lb)
-- Hamburger buns (1 pkg)
-- Sloppy Joe sauce (or ketchup/Worcestershire/brown sugar)
-- Coleslaw mix (pre-shredded cabbage + dressing or make)
+### Thu — Lunch: Sloppy Joes (pre-made, bring) + coleslaw
+- **Sloppy Joes (pre-made, bring)** — Ryan
+- Coleslaw mix + dressing (make on-site)
 
 ### Thu — Dinner: Chicken skewers, greek salad, lemon potatoes
 - Chicken (boneless thighs/breasts ~3 lb), cut for skewers
@@ -115,12 +113,13 @@
 ### Sat — Breakfast: DIY (all)
 - Whatever's left: eggs, yogurt, granola, fruit, toast
 
-### Sat — Lunch: Pork & beans (Summerhill) **OR** chicken salad
-- **Option A:** Pork & beans (pre-made from Summerhill) — Ryan brings
-- **Option B:** Chicken salad (make-ahead): cooked chicken, mayo, celery, grapes, on bread/lettuce
+### Sat — Lunch: Chicken salad (Ryan brings pre-made)
+- Chicken salad (make-ahead, bring): cooked chicken, mayo, celery, grapes
+- Bread or lettuce to serve on
 
-### Sat — Dinner: DIY (all)
-- Leftover-driven: pulled pork, pizza, bbq, whatever's left
+### Sat — Dinner: Garlic shrimp + sesame soba noodles (Dana & Sean)
+- Garlic shrimp, sesame soba noodles — D&S handle
+- (Backup / leftovers also available)
 
 ### Sun — Leave: Leftovers, DIY breakfast
 - No planned meals; eat down the fridge

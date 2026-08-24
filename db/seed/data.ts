@@ -25,6 +25,7 @@ export type SeedMeal = {
 };
 
 const RYAN = "ryankrook@gmail.com";
+const GREG = "chociejgreg@gmail.com";
 const DANA = "danakrook@gmail.com";
 const SEAN = "sean.hemraj@live.com";
 const DS = [DANA, SEAN];
@@ -115,8 +116,9 @@ export const MEALS: SeedMeal[] = [
     title: "Sloppy Joes & Coleslaw",
     displayDescription:
       "Coarsely ground beef braised in a piquant tomato lacquer with notes of Worcestershire and unrefined sugar, deliberately served in a state of structural collapse. Napkins are provided without judgement.",
-    practicalNotes: "~2 lb ground beef, hamburger buns, sloppy joe sauce, coleslaw mix.",
-    responsible: [],
+    practicalNotes:
+      "Ryan brings the sloppy joe filling made ahead. Hamburger buns, plus coleslaw mix and dressing made on-site.",
+    responsible: [RYAN],
   },
   {
     mealDate: "2026-09-03",
@@ -173,7 +175,8 @@ export const MEALS: SeedMeal[] = [
     title: "Chicken Salad",
     displayDescription:
       "Poached chicken hand-torn and bound in a house aioli, punctuated by the vegetal snap of celery and the sudden sweetness of table grape. Presented on soft bread or in a leaf of butter lettuce, per the guest's disposition.",
-    practicalNotes: "Make-ahead. Cooked chicken, mayo, celery, grapes. On bread or lettuce.",
+    practicalNotes:
+      "Ryan brings it made ahead. Cooked chicken, mayo, celery, grapes. Bread or lettuce to serve on.",
     responsible: [RYAN],
   },
   {
@@ -183,8 +186,8 @@ export const MEALS: SeedMeal[] = [
     displayDescription:
       "Wild shrimp seared in a foaming garlic butter until barely opaque, set against chilled buckwheat noodles dressed in toasted sesame and scattered with scallion. A bright, restrained finish to the week.",
     practicalNotes:
-      "Note: the week-at-a-glance table lists this; the per-meal grocery section said DIY leftovers. Confirm which you want.",
-    responsible: DS,
+      "Greg's meal to plan. Shrimp, garlic, butter, soba noodles, toasted sesame, scallion. Leftovers are the backup if the week has gone sideways.",
+    responsible: [GREG],
   },
   {
     mealDate: "2026-09-06",
