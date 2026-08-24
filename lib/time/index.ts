@@ -44,18 +44,22 @@ export function addDays(isoDate: string, days: number): string {
   return dt.toISOString().slice(0, 10);
 }
 
-/** "just now" / "47 min ago" / "3 hr ago" / "2 days ago" */
+/** "just now" / "47 minutes ago" / "3 hours ago" / "2 days ago" */
 export function relativeTime(date: Date | string, now: Date = new Date()): string {
   const then = toDate(date);
   const seconds = Math.round((now.getTime() - then.getTime()) / 1000);
   if (seconds < 0) return "just now";
   if (seconds < 60) return "just now";
   const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes} min ago`;
+  if (minutes < 60) return ago(minutes, "minute");
   const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours} hr ago`;
+  if (hours < 24) return ago(hours, "hour");
   const days = Math.round(hours / 24);
-  return days === 1 ? "1 day ago" : `${days} days ago`;
+  return ago(days, "day");
+}
+
+function ago(count: number, unit: string): string {
+  return `${count} ${unit}${count === 1 ? "" : "s"} ago`;
 }
 
 /**

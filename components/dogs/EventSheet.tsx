@@ -2,9 +2,16 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { RelativeTime } from "@/components/ui/RelativeTime";
 import { useToast } from "@/components/ui/Toast";
 import { deletePetEvent, updatePetEventTime } from "@/app/(app)/dogs/actions";
-import { formatClock, formatWeekday, fromCottageInputValue, toCottageInputValue } from "@/lib/time";
+import {
+  formatClock,
+  formatWeekday,
+  fromCottageInputValue,
+  relativeTime,
+  toCottageInputValue,
+} from "@/lib/time";
 import type { PetEventType } from "@/db/schema";
 
 export type SheetEvent = {
@@ -108,7 +115,15 @@ export function EventSheet({
                     <div className="min-w-0">
                       <p className="font-bold text-ink">{TYPE_LABEL[event.eventType]}</p>
                       <p className="text-sm text-muted">
-                        {formatWeekday(when)} · {formatClock(when)} · {event.recordedBy}
+                        <span className="font-semibold text-ink">
+                          <RelativeTime iso={event.occurredAt} initial={relativeTime(when)} />
+                        </span>
+                        {" · "}
+                        {event.recordedBy}
+                      </p>
+                      {/* The exact stamp stays visible — this is where times get edited. */}
+                      <p className="text-xs text-muted">
+                        {formatWeekday(when)} · {formatClock(when)}
                       </p>
                     </div>
                     {editingId === event.id ? null : (

@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { RelativeTime } from "@/components/ui/RelativeTime";
 import { useToast } from "@/components/ui/Toast";
 import { recordPetEvent } from "@/app/(app)/dogs/actions";
-import { formatClock, relativeTime } from "@/lib/time";
+import { relativeTime } from "@/lib/time";
 import type { PetEventType } from "@/db/schema";
 import { EventSheet, type SheetEvent } from "./EventSheet";
 
@@ -85,39 +85,43 @@ export function DogSection({ slug, name, latest, recent, currentMemberName }: Do
         </button>
       </div>
 
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-6">
         {ACTIONS.map((action) => {
           const value = optimistic[action.type] ?? latest[action.type];
           const busy = pendingType === action.type;
           return (
-            <div key={action.type} className="overflow-hidden rounded-3xl border border-line bg-card">
+            <div key={action.type} className="flex flex-col gap-2">
+              {/* The raised, full-colour pill is the button; the status line
+                  below sits outside it so it never reads as a card header. */}
               <button
                 type="button"
                 onClick={() => handleTap(action.type)}
                 disabled={Boolean(pendingType)}
-                className={`tap w-full px-4 py-6 text-xl font-extrabold tracking-wide text-white transition disabled:opacity-70 ${action.tone}`}
+                className={`tap flex w-full items-center justify-between gap-3 rounded-full px-6 py-5 text-lg font-extrabold tracking-wide text-white shadow-[0_3px_0_rgba(38,32,26,0.22)] transition active:translate-y-[3px] active:shadow-none disabled:opacity-70 ${action.tone}`}
               >
-                {busy ? "…" : action.label(name)}
+                <span>{busy ? "…" : action.label(name)}</span>
+                <span aria-hidden="true" className="text-2xl leading-none opacity-80">
+                  +
+                </span>
               </button>
-              <div className="px-4 py-3">
-                <p className="text-xs font-bold uppercase tracking-wide text-muted">
+              <p className="flex flex-wrap items-baseline gap-x-2 px-2 text-sm">
+                <span className="text-xs font-bold uppercase tracking-wide text-muted">
                   {action.status}
-                </p>
+                </span>
                 {value ? (
-                  <p className="mt-0.5 text-sm text-ink">
-                    <span className="font-bold">{formatClock(new Date(value.occurredAt))}</span>
-                    {" · "}
-                    <RelativeTime
-                      iso={value.occurredAt}
-                      initial={relativeTime(new Date(value.occurredAt))}
-                    />
-                    {" · "}
-                    <span className="text-muted">{value.recordedBy}</span>
-                  </p>
+                  <>
+                    <span className="font-bold text-ink">
+                      <RelativeTime
+                        iso={value.occurredAt}
+                        initial={relativeTime(new Date(value.occurredAt))}
+                      />
+                    </span>
+                    <span className="text-muted">by {value.recordedBy}</span>
+                  </>
                 ) : (
-                  <p className="mt-0.5 text-sm text-muted">Not yet today</p>
+                  <span className="text-muted">nothing recorded yet</span>
                 )}
-              </div>
+              </p>
             </div>
           );
         })}

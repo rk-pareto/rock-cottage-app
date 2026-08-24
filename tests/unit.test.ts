@@ -72,8 +72,8 @@ describe("cottage time", () => {
   it("describes recent events in human terms", () => {
     const now = new Date("2026-09-02T20:00:00Z");
     expect(relativeTime(new Date("2026-09-02T19:59:30Z"), now)).toBe("just now");
-    expect(relativeTime(new Date("2026-09-02T19:13:00Z"), now)).toBe("47 min ago");
-    expect(relativeTime(new Date("2026-09-02T17:00:00Z"), now)).toBe("3 hr ago");
+    expect(relativeTime(new Date("2026-09-02T19:13:00Z"), now)).toBe("47 minutes ago");
+    expect(relativeTime(new Date("2026-09-02T17:00:00Z"), now)).toBe("3 hours ago");
     expect(relativeTime(new Date("2026-09-01T20:00:00Z"), now)).toBe("1 day ago");
   });
 

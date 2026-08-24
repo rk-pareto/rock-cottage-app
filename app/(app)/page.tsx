@@ -8,7 +8,7 @@ import { getUpcomingMeals } from "@/lib/meals";
 import { getReadyPhotos, withThumbnailUrls } from "@/lib/photos";
 import { getOpenShoppingItems } from "@/lib/shopping";
 import { isStorageConfigured } from "@/lib/storage/s3";
-import { cottageToday, formatClock, formatLongDate, relativeTime } from "@/lib/time";
+import { cottageToday, formatLongDate, relativeTime } from "@/lib/time";
 import type { PetEventType } from "@/db/schema";
 
 export const metadata: Metadata = { title: "Rock Cottage" };
@@ -87,13 +87,11 @@ export default async function HomePage() {
                   {event ? (
                     <span className="text-muted">
                       <span className="font-semibold text-ink">
-                        {formatClock(event.occurredAt)}
+                        <RelativeTime
+                          iso={event.occurredAt.toISOString()}
+                          initial={relativeTime(event.occurredAt)}
+                        />
                       </span>
-                      {" · "}
-                      <RelativeTime
-                        iso={event.occurredAt.toISOString()}
-                        initial={relativeTime(event.occurredAt)}
-                      />
                       {" · "}
                       {event.recordedBy}
                     </span>

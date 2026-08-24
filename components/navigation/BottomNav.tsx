@@ -59,12 +59,12 @@ export function BottomNav({ dogsLabel }: { dogsLabel: string }) {
       ),
     },
     {
-      href: "/shopping",
-      label: "Shopping",
+      href: "/photos",
+      label: "Photos",
       icon: (
         <Icon>
-          <path d="M4 7h16l-1.3 11.2a2 2 0 0 1-2 1.8H7.3a2 2 0 0 1-2-1.8z" />
-          <path d="M8.8 7V5.6a3.2 3.2 0 0 1 6.4 0V7" />
+          <path d="M3.5 8.5a1.8 1.8 0 0 1 1.8-1.8h2.2l1.3-2h6.4l1.3 2h2.2a1.8 1.8 0 0 1 1.8 1.8v9a1.8 1.8 0 0 1-1.8 1.8H5.3a1.8 1.8 0 0 1-1.8-1.8z" />
+          <circle cx="12" cy="13" r="3.4" />
         </Icon>
       ),
     },
@@ -81,8 +81,8 @@ export function BottomNav({ dogsLabel }: { dogsLabel: string }) {
     },
   ];
 
-  // /photos, /bringing, /info and /account all live under "More".
-  const moreRoutes = ["/photos", "/bringing", "/info", "/account", "/more"];
+  // /shopping, /bringing, /info and /account all live under "More".
+  const moreRoutes = ["/shopping", "/bringing", "/info", "/account", "/more"];
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-card/95 backdrop-blur safe-bottom">

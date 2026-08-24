@@ -5,7 +5,7 @@ import { requireMember } from "@/lib/auth/membership";
 export const metadata: Metadata = { title: "More · Rock Cottage" };
 
 const LINKS = [
-  { href: "/photos", label: "Photos", hint: "Everyone's pictures from the week", emoji: "📷" },
+  { href: "/shopping", label: "Shopping", hint: "What we need from town", emoji: "🛒" },
   { href: "/bringing", label: "We're Bringing", hint: "Who's got the ketchup", emoji: "🧺" },
   { href: "/info", label: "Cottage Info", hint: "Address, wifi, emergency", emoji: "🗺️" },
   { href: "/account", label: "Account", hint: "Your details and sign out", emoji: "👤" },

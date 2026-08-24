@@ -30,15 +30,15 @@ Authentication is required for all application content.
 
 The primary fixed bottom navigation is:
 
-Home · Meals · Alice · Shopping · More
+Home · Meals · Alice · Photos · More
 
 When the Juno feature flag is enabled:
 
-Home · Meals · Dogs · Shopping · More
+Home · Meals · Dogs · Photos · More
 
 "More" contains:
 
-- Photos
+- Shopping
 - We're Bringing
 - Info
 - Account / Sign out
