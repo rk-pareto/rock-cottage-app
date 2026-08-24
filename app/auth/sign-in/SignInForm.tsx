@@ -1,32 +1,49 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { sendMagicLink } from "@/lib/auth/actions";
 
 export function SignInForm() {
   const router = useRouter();
-  const [, startTransition] = useTransition();
   const [email, setEmail] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function onSubmit(event: React.FormEvent) {
+  async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
     const trimmed = email.trim().toLowerCase();
     if (!trimmed || pending) return;
 
     setPending(true);
     setError(null);
-    startTransition(async () => {
-      const result = await sendMagicLink(trimmed);
-      if (result.ok) {
-        router.push(`/auth/check-email?email=${encodeURIComponent(trimmed)}`);
-      } else {
-        setError(result.error);
+    try {
+      /*
+       * Posted from the browser to our own Neon Auth proxy on purpose. The
+       * magic-link URL is built from the request's `Origin` header, and only a
+       * real browser request carries one — behind Railway's proxy the
+       * server-side fallback (`new URL(request.url).origin`) resolves to the
+       * container's internal address and the emailed link points at localhost.
+       *
+       * `callbackURL` must stay relative; an absolute URL is rejected as
+       * INVALID_CALLBACK_URL even when that exact origin is whitelisted.
+       */
+      const response = await fetch("/api/auth/sign-in/magic-link", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: trimmed, callbackURL: "/" }),
+      });
+
+      if (!response.ok) {
+        setError("We couldn't send that link. Check the address and try again.");
         setPending(false);
+        return;
       }
-    });
+
+      router.push(`/auth/check-email?email=${encodeURIComponent(trimmed)}`);
+    } catch {
+      setError("We couldn't send that link. Try again in a moment.");
+      setPending(false);
+    }
   }
 
   return (
