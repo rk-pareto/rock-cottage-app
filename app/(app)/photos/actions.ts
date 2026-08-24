@@ -32,14 +32,21 @@ export async function deletePhoto(photoId: string): Promise<ActionResult> {
     // Remove the row first: an orphaned object is a smaller problem than a
     // gallery entry whose bytes have vanished.
     await db.delete(photos).where(eq(photos.id, photo.id));
+  } catch (error) {
+    console.error("deletePhoto failed", error);
+    return { ok: false, error: "Couldn't delete that photo. Try again." };
+  }
+
+  // The photo is gone from the user's point of view. Bucket cleanup is
+  // best-effort — a failure here must not report the delete as failed.
+  try {
     await deleteObjects(
       [photo.originalKey, photo.displayKey, photo.thumbnailKey].filter(
         (k): k is string => Boolean(k),
       ),
     );
   } catch (error) {
-    console.error("deletePhoto failed", error);
-    return { ok: false, error: "Couldn't delete that photo. Try again." };
+    console.error("deletePhoto: object cleanup failed", photo.id, error);
   }
 
   revalidatePath("/photos");

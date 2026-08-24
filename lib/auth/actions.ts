@@ -5,8 +5,6 @@ import { auth } from "./neon-auth";
 
 export type SignInResult = { ok: true } | { ok: false; error: string };
 
-const APP_URL = process.env.APP_URL || "http://localhost:3000";
-
 /**
  * Send a magic link. Done as a server action so the browser never talks to
  * Neon Auth directly and no client key is needed.
@@ -21,9 +19,12 @@ export async function sendMagicLink(email: string): Promise<SignInResult> {
   }
 
   try {
+    // Neon Auth requires a *relative* callback; it resolves against the
+    // branch's trusted domain. An absolute URL is rejected as
+    // INVALID_CALLBACK_URL even when that exact origin is whitelisted.
     const { error } = await auth.signIn.magicLink({
       email: trimmed,
-      callbackURL: `${APP_URL}/`,
+      callbackURL: "/",
     });
     if (error) {
       console.error("sendMagicLink failed", error);
