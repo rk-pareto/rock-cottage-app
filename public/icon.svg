@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Rock Cottage">
+  <rect width="512" height="512" rx="112" fill="#2f5d50"/>
+  <circle cx="256" cy="180" r="62" fill="#f6c66b"/>
+  <path d="M150 300 L206 196 L262 300 Z" fill="#fdf8f0"/>
+  <path d="M232 316 L300 190 L368 316 Z" fill="#fdf8f0"/>
+  <rect x="288" y="316" width="24" height="46" rx="8" fill="#fdf8f0"/>
+  <path d="M64 392c48-22 80-22 128 0s80 22 128 0 80-22 128 0v56H64z" fill="#2f6f8f"/>
+</svg>

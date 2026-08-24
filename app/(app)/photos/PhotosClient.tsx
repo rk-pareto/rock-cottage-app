@@ -1,0 +1,321 @@
+"use client";
+
+import { useCallback, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { useToast } from "@/components/ui/Toast";
+import { deletePhoto } from "./actions";
+
+export type PhotoCardData = {
+  id: string;
+  originalFilename: string;
+  uploadedBy: string;
+  uploadedByMemberId: string;
+  processingStatus: string;
+  thumbnailUrl: string | null;
+  createdAt: string;
+};
+
+type UploadState = {
+  key: string;
+  name: string;
+  stage: "uploading" | "processing" | "done" | "failed";
+  message?: string;
+};
+
+export function PhotosClient({
+  photos,
+  currentMemberId,
+  isAdmin,
+  storageReady,
+}: {
+  photos: PhotoCardData[];
+  currentMemberId: string;
+  isAdmin: boolean;
+  storageReady: boolean;
+}) {
+  const router = useRouter();
+  const toast = useToast();
+  const [, startTransition] = useTransition();
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [uploads, setUploads] = useState<UploadState[]>([]);
+  const [lightboxId, setLightboxId] = useState<string | null>(null);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+
+  const setStage = useCallback(
+    (key: string, stage: UploadState["stage"], message?: string) => {
+      setUploads((current) =>
+        current.map((u) => (u.key === key ? { ...u, stage, message } : u)),
+      );
+    },
+    [],
+  );
+
+  /** Upload one file end to end: intent → direct PUT → complete. */
+  const uploadOne = useCallback(
+    async (file: File, key: string) => {
+      try {
+        const intentResponse = await fetch("/api/photos/upload-intent", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            filename: file.name,
+            // Some phones report an empty type for HEIC; fall back by extension.
+            contentType: file.type || guessContentType(file.name),
+            bytes: file.size,
+          }),
+        });
+
+        if (!intentResponse.ok) {
+          const body = await intentResponse.json().catch(() => ({}));
+          setStage(key, "failed", body.error ?? "Upload couldn't start.");
+          return;
+        }
+
+        const { photoId, uploadUrl } = (await intentResponse.json()) as {
+          photoId: string;
+          uploadUrl: string;
+        };
+
+        // The original goes straight to the bucket, never through Next.
+        const putResponse = await fetch(uploadUrl, {
+          method: "PUT",
+          body: file,
+          headers: { "content-type": file.type || guessContentType(file.name) },
+        });
+        if (!putResponse.ok) {
+          setStage(key, "failed", "The upload didn't finish.");
+          return;
+        }
+
+        setStage(key, "processing");
+        const completeResponse = await fetch(`/api/photos/${photoId}/complete`, {
+          method: "POST",
+        });
+        const completeBody = (await completeResponse.json().catch(() => ({}))) as {
+          status?: string;
+          error?: string;
+        };
+
+        if (completeBody.status === "ready") {
+          setStage(key, "done");
+        } else {
+          setStage(key, "failed", completeBody.error ?? "Preview couldn't be created.");
+        }
+        router.refresh();
+      } catch {
+        setStage(key, "failed", "Something went wrong. Try again.");
+      }
+    },
+    [router, setStage],
+  );
+
+  async function onFilesChosen(event: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = ""; // let the same file be re-picked
+    if (files.length === 0) return;
+
+    const entries = files.map((file, index) => ({
+      file,
+      key: `${Date.now()}-${index}-${file.name}`,
+    }));
+    setUploads((current) => [
+      ...current,
+      ...entries.map(({ file, key }) => ({
+        key,
+        name: file.name,
+        stage: "uploading" as const,
+      })),
+    ]);
+
+    // Sequential: kinder to phone radios and to the server's image workers.
+    for (const { file, key } of entries) {
+      await uploadOne(file, key);
+    }
+  }
+
+  function remove(photo: PhotoCardData) {
+    startTransition(async () => {
+      const result = await deletePhoto(photo.id);
+      setConfirmingId(null);
+      if (result.ok) {
+        setLightboxId(null);
+        toast("Photo deleted");
+        router.refresh();
+      } else {
+        toast(result.error, "error");
+      }
+    });
+  }
+
+  const activeUploads = uploads.filter((u) => u.stage !== "done");
+  const lightboxPhoto = photos.find((p) => p.id === lightboxId) ?? null;
+  const canDelete = (photo: PhotoCardData) =>
+    photo.uploadedByMemberId === currentMemberId || isAdmin;
+
+  return (
+    <>
+      <input
+        ref={fileInput}
+        type="file"
+        accept="image/*,.heic,.heif"
+        multiple
+        onChange={onFilesChosen}
+        className="hidden"
+      />
+      <button
+        type="button"
+        disabled={!storageReady}
+        onClick={() => fileInput.current?.click()}
+        className="tap mb-4 w-full rounded-2xl bg-pine px-4 py-3.5 text-base font-bold text-white active:bg-pine-dark disabled:opacity-50"
+      >
+        {storageReady ? "＋ Add photos" : "Photo storage isn't set up yet"}
+      </button>
+
+      {activeUploads.length > 0 ? (
+        <ul className="mb-4 flex flex-col gap-2">
+          {activeUploads.map((upload) => (
+            <li
+              key={upload.key}
+              className="flex items-center gap-3 rounded-2xl border border-line bg-card px-3 py-2 text-sm"
+            >
+              <span className="min-w-0 flex-1 truncate text-ink">{upload.name}</span>
+              <span
+                className={`shrink-0 font-bold ${
+                  upload.stage === "failed" ? "text-clay" : "text-muted"
+                }`}
+              >
+                {upload.stage === "uploading"
+                  ? "Uploading…"
+                  : upload.stage === "processing"
+                    ? "Processing…"
+                    : (upload.message ?? "Failed")}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {photos.length === 0 ? (
+        <p className="rounded-2xl border border-dashed border-line px-4 py-10 text-center text-sm text-muted">
+          No photos yet. Someone go take a picture of the lake.
+        </p>
+      ) : (
+        <ul className="grid grid-cols-3 gap-1.5">
+          {photos.map((photo) => (
+            <li key={photo.id} className="aspect-square">
+              {photo.thumbnailUrl ? (
+                <button
+                  type="button"
+                  onClick={() => setLightboxId(photo.id)}
+                  className="h-full w-full overflow-hidden rounded-xl bg-line"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={photo.thumbnailUrl}
+                    alt={`Uploaded by ${photo.uploadedBy}`}
+                    loading="lazy"
+                    className="h-full w-full object-cover"
+                  />
+                </button>
+              ) : (
+                <div className="flex h-full w-full flex-col items-center justify-center rounded-xl border border-dashed border-line p-1 text-center">
+                  <span className="text-[10px] font-bold text-muted">
+                    {photo.processingStatus === "failed" ? "No preview" : "Processing…"}
+                  </span>
+                  {canDelete(photo) ? (
+                    <button
+                      type="button"
+                      onClick={() => remove(photo)}
+                      className="mt-1 text-[10px] font-bold text-clay"
+                    >
+                      Delete
+                    </button>
+                  ) : null}
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {lightboxPhoto ? (
+        <div className="fixed inset-0 z-50 flex flex-col bg-ink/95" role="dialog" aria-modal="true">
+          <div className="flex items-center justify-between p-3 text-white">
+            <span className="min-w-0 truncate text-sm">
+              {lightboxPhoto.uploadedBy}
+            </span>
+            <button
+              type="button"
+              onClick={() => setLightboxId(null)}
+              className="tap rounded-xl px-3 py-2 text-sm font-bold"
+            >
+              Close
+            </button>
+          </div>
+
+          <div className="flex flex-1 items-center justify-center overflow-hidden p-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`/api/photos/${lightboxPhoto.id}/view`}
+              alt={`Uploaded by ${lightboxPhoto.uploadedBy}`}
+              className="max-h-full max-w-full object-contain"
+            />
+          </div>
+
+          <div className="flex flex-wrap gap-2 p-3 safe-bottom">
+            <a
+              href={`/api/photos/${lightboxPhoto.id}/download?variant=display`}
+              className="tap flex-1 rounded-2xl bg-white/15 px-4 py-3 text-center text-sm font-bold text-white"
+            >
+              Download optimized
+            </a>
+            <a
+              href={`/api/photos/${lightboxPhoto.id}/download?variant=original`}
+              className="tap flex-1 rounded-2xl bg-white/15 px-4 py-3 text-center text-sm font-bold text-white"
+            >
+              Download original
+            </a>
+            {canDelete(lightboxPhoto) ? (
+              confirmingId === lightboxPhoto.id ? (
+                <div className="flex w-full gap-2">
+                  <button
+                    type="button"
+                    onClick={() => remove(lightboxPhoto)}
+                    className="tap flex-1 rounded-2xl bg-clay px-4 py-3 text-sm font-bold text-white"
+                  >
+                    Delete for everyone
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmingId(null)}
+                    className="tap rounded-2xl px-4 py-3 text-sm font-bold text-white/70"
+                  >
+                    Keep
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmingId(lightboxPhoto.id)}
+                  className="tap w-full rounded-2xl border border-white/25 px-4 py-3 text-sm font-bold text-white/80"
+                >
+                  Delete
+                </button>
+              )
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+function guessContentType(filename: string): string {
+  const ext = filename.toLowerCase().split(".").pop() ?? "";
+  if (ext === "heic") return "image/heic";
+  if (ext === "heif") return "image/heif";
+  if (ext === "png") return "image/png";
+  if (ext === "webp") return "image/webp";
+  if (ext === "gif") return "image/gif";
+  return "image/jpeg";
+}

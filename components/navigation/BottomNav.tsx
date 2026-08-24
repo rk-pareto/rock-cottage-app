@@ -1,0 +1,115 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+
+type Item = { href: string; label: string; icon: React.ReactNode };
+
+const stroke = {
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 1.9,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+};
+
+function Icon({ children }: { children: React.ReactNode }) {
+  return (
+    <svg viewBox="0 0 24 24" className="h-6 w-6" aria-hidden="true" {...stroke}>
+      {children}
+    </svg>
+  );
+}
+
+export function BottomNav({ dogsLabel }: { dogsLabel: string }) {
+  const pathname = usePathname();
+
+  const items: Item[] = [
+    {
+      href: "/",
+      label: "Home",
+      icon: (
+        <Icon>
+          <path d="M3.5 10.5 12 3.5l8.5 7" />
+          <path d="M5.5 9.5V20h13V9.5" />
+        </Icon>
+      ),
+    },
+    {
+      href: "/meals",
+      label: "Meals",
+      icon: (
+        <Icon>
+          <path d="M6 3v8a2.5 2.5 0 0 0 5 0V3" />
+          <path d="M8.5 11v10" />
+          <path d="M17.5 3c-1.5 1.5-2 3.5-2 5.5s.7 3 2 3.5V21" />
+        </Icon>
+      ),
+    },
+    {
+      href: "/dogs",
+      label: dogsLabel,
+      icon: (
+        <Icon>
+          <path d="M5.5 10.5c0-1 .8-1.8 1.8-1.8h9.4c1 0 1.8.8 1.8 1.8v3.9a4.6 4.6 0 0 1-4.6 4.6h-3.8a4.6 4.6 0 0 1-4.6-4.6z" />
+          <path d="M5.6 9 4.2 5.2 7.6 7" />
+          <path d="M18.4 9l1.4-3.8L16.4 7" />
+          <path d="M10 13h.01M14 13h.01" />
+        </Icon>
+      ),
+    },
+    {
+      href: "/shopping",
+      label: "Shopping",
+      icon: (
+        <Icon>
+          <path d="M4 7h16l-1.3 11.2a2 2 0 0 1-2 1.8H7.3a2 2 0 0 1-2-1.8z" />
+          <path d="M8.8 7V5.6a3.2 3.2 0 0 1 6.4 0V7" />
+        </Icon>
+      ),
+    },
+    {
+      href: "/more",
+      label: "More",
+      icon: (
+        <Icon>
+          <circle cx="5.5" cy="12" r="1.4" />
+          <circle cx="12" cy="12" r="1.4" />
+          <circle cx="18.5" cy="12" r="1.4" />
+        </Icon>
+      ),
+    },
+  ];
+
+  // /photos, /bringing, /info and /account all live under "More".
+  const moreRoutes = ["/photos", "/bringing", "/info", "/account", "/more"];
+
+  return (
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-card/95 backdrop-blur safe-bottom">
+      <ul className="mx-auto flex max-w-3xl items-stretch">
+        {items.map((item) => {
+          const active =
+            item.href === "/"
+              ? pathname === "/"
+              : item.href === "/more"
+                ? moreRoutes.some((r) => pathname.startsWith(r))
+                : pathname.startsWith(item.href);
+          return (
+            <li key={item.href} className="flex-1">
+              <Link
+                href={item.href}
+                aria-current={active ? "page" : undefined}
+                className={`tap flex flex-col items-center justify-center gap-0.5 py-2 transition-colors active:bg-paper ${
+                  active ? "text-pine" : "text-muted"
+                }`}
+              >
+                {item.icon}
+                <span className="text-[11px] font-bold tracking-tight">{item.label}</span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
+  );
+}
