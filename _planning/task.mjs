@@ -18,7 +18,8 @@ if (cmd === "status") {
   writeFileSync(FILE, rows.map((r) => JSON.stringify(r)).join("\n") + "\n");
   console.log(`updated ${ids.join(", ")} -> ${status}`);
 } else {
-  const filter = args[0];
+  // `list` is optional: `task.mjs blocked` works as well as `task.mjs list blocked`
+  const filter = cmd === "list" ? args[0] : cmd;
   const shown = filter ? rows.filter((r) => r.phase.includes(filter) || r.status === filter) : rows;
   for (const r of shown) console.log(`${r.status.padEnd(8)} ${r.id}  ${r.title}`);
   const counts = rows.reduce((a, r) => ({ ...a, [r.status]: (a[r.status] || 0) + 1 }), {});

@@ -7,9 +7,9 @@
 {"id":"T011","phase":"1-infra","title":"Authenticate Neon CLI (operator action)","status":"done","depends_on":[],"notes":"BLOCKER: neon CLI has no stored credentials (~/.config/neonctl empty); commands hang on browser flow"}
 {"id":"T012","phase":"1-infra","title":"Create Neon project + production/development branches","status":"done","depends_on":["T011"],"notes":"BLOCKER: neon CLI has no stored credentials (~/.config/neonctl empty); commands hang on browser flow"}
 {"id":"T013","phase":"1-infra","title":"Provision Neon Auth, enable magic-link (OTP/email link), get keys","status":"done","depends_on":["T012"],"notes":"BLOCKER: neon CLI has no stored credentials (~/.config/neonctl empty); commands hang on browser flow"}
-{"id":"T014","phase":"1-infra","title":"Create Railway project + Next.js service, region us-east","status":"blocked","depends_on":["T010"],"notes":""}
-{"id":"T015","phase":"1-infra","title":"Create private Railway Bucket, inject S3 creds into app service","status":"blocked","depends_on":["T014"],"notes":""}
-{"id":"T016","phase":"1-infra","title":"Set Railway env vars (DATABASE_URL, auth keys, APP_TIMEZONE, flags)","status":"blocked","depends_on":["T014","T012","T013"],"notes":""}
+{"id":"T014","phase":"1-infra","title":"Create Railway project + Next.js service, region us-east","status":"done","depends_on":["T010"],"notes":""}
+{"id":"T015","phase":"1-infra","title":"Create private Railway Bucket, inject S3 creds into app service","status":"done","depends_on":["T014"],"notes":""}
+{"id":"T016","phase":"1-infra","title":"Set Railway env vars (DATABASE_URL, auth keys, APP_TIMEZONE, flags)","status":"done","depends_on":["T014","T012","T013"],"notes":""}
 {"id":"T020","phase":"2-data","title":"Drizzle schema: members, meals, meal_assignments, shopping_items, bringing_items, pets, pet_events, photos","status":"done","depends_on":["T004"],"notes":"incl. all indexes from spec s18"}
 {"id":"T021","phase":"2-data","title":"drizzle.config + db client + generate initial migration","status":"done","depends_on":["T020"],"notes":""}
 {"id":"T022","phase":"2-data","title":"Idempotent seed script (members, pets, meals, meal_assignments)","status":"done","depends_on":["T021"],"notes":"natural keys: email, slug, meal_date+meal_type+title"}
@@ -17,7 +17,7 @@
 {"id":"T030","phase":"3-auth","title":"Wire Neon Auth (Stack) provider, handler route, sign-in/check-email pages","status":"done","depends_on":["T004"],"notes":"Stack/Neon Auth wired: server+client app, /handler route. Sign-in UI pending."}
 {"id":"T031","phase":"3-auth","title":"requireMember() server guard + members allowlist binding on first login","status":"done","depends_on":["T030","T020"],"notes":"normalize email lowercase; bind auth_user_id"}
 {"id":"T032","phase":"3-auth","title":"Unauthorized page + middleware/layout protection for all app routes","status":"done","depends_on":["T031"],"notes":""}
-{"id":"T033","phase":"3-auth","title":"Long session (~90d) config","status":"todo","depends_on":["T030"],"notes":""}
+{"id":"T033","phase":"3-auth","title":"Long session (~90d) config","status":"done","depends_on":["T030"],"notes":""}
 {"id":"T040","phase":"4-features","title":"App shell: bottom nav (safe-area), layout, max-width column, refresh-on-focus + 30s poll","status":"done","depends_on":["T032"],"notes":"nav label Alice vs Dogs per flag"}
 {"id":"T041","phase":"4-features","title":"Home dashboard: upcoming meals, dog status, shopping summary, recent photos","status":"done","depends_on":["T040"],"notes":"parallel queries, no activity-feed system"}
 {"id":"T042","phase":"4-features","title":"Meals screen (read-only, grouped by day)","status":"done","depends_on":["T040"],"notes":""}
@@ -30,18 +30,18 @@
 {"id":"T051","phase":"4-photos","title":"Photo upload intent + complete API routes, pending->ready state machine","status":"done","depends_on":["T050","T031"],"notes":"server-generated keys only"}
 {"id":"T052","phase":"4-photos","title":"Sharp processing: display 2560px + thumb 640px webp, concurrency limit 1-2, HEIC support","status":"done","depends_on":["T051"],"notes":"original never touched; failure keeps original"}
 {"id":"T053","phase":"4-photos","title":"Photos grid UI, lightbox, per-photo upload state, downloads (original+optimized), delete own","status":"done","depends_on":["T052"],"notes":""}
-{"id":"T054","phase":"4-photos","title":"Test JPEG, PNG/WebP, and real iPhone HEIC through the pipeline","status":"todo","depends_on":["T053"],"notes":"NEEDS OPERATOR INPUT: a real HEIC file helps"}
-{"id":"T060","phase":"5-pwa","title":"PWA manifest, icons, standalone mode, theme color, safe-area verification","status":"todo","depends_on":["T040"],"notes":""}
-{"id":"T061","phase":"5-pwa","title":"UI polish: loading/pressed states, empty states, toasts, dup-submit prevention","status":"todo","depends_on":["T040"],"notes":""}
-{"id":"T070","phase":"6-tests","title":"Vitest setup + authorization rule tests","status":"todo","depends_on":["T031"],"notes":""}
-{"id":"T071","phase":"6-tests","title":"Business-rule tests: shopping, bringing, dogs, photos, meals, info","status":"todo","depends_on":["T070"],"notes":"per spec s40"}
-{"id":"T072","phase":"6-tests","title":"Run lint + typecheck + tests clean","status":"todo","depends_on":["T071"],"notes":""}
+{"id":"T054","phase":"4-photos","title":"Test JPEG, PNG/WebP, and real iPhone HEIC through the pipeline","status":"done","depends_on":["T053"],"notes":"NEEDS OPERATOR INPUT: a real HEIC file helps"}
+{"id":"T060","phase":"5-pwa","title":"PWA manifest, icons, standalone mode, theme color, safe-area verification","status":"done","depends_on":["T040"],"notes":""}
+{"id":"T061","phase":"5-pwa","title":"UI polish: loading/pressed states, empty states, toasts, dup-submit prevention","status":"done","depends_on":["T040"],"notes":""}
+{"id":"T070","phase":"6-tests","title":"Vitest setup + authorization rule tests","status":"done","depends_on":["T031"],"notes":""}
+{"id":"T071","phase":"6-tests","title":"Business-rule tests: shopping, bringing, dogs, photos, meals, info","status":"done","depends_on":["T070"],"notes":"per spec s40"}
+{"id":"T072","phase":"6-tests","title":"Run lint + typecheck + tests clean","status":"done","depends_on":["T071"],"notes":""}
 {"id":"T080","phase":"7-deploy","title":"railway.json: preDeployCommand db:migrate, healthcheck /api/health","status":"done","depends_on":["T004"],"notes":""}
 {"id":"T081","phase":"7-deploy","title":"/api/health route","status":"done","depends_on":["T003"],"notes":""}
-{"id":"T082","phase":"7-deploy","title":"First deploy to Railway + generate public domain","status":"blocked","depends_on":["T016","T080"],"notes":""}
-{"id":"T083","phase":"7-deploy","title":"Configure Neon Auth trusted origin/callback to Railway domain, set APP_URL, redeploy","status":"blocked","depends_on":["T082"],"notes":""}
-{"id":"T084","phase":"7-deploy","title":"Run production migrations + seed","status":"blocked","depends_on":["T082"],"notes":""}
-{"id":"T085","phase":"7-deploy","title":"End-to-end magic-link login test in production","status":"blocked","depends_on":["T083","T084"],"notes":""}
-{"id":"T086","phase":"7-deploy","title":"Production smoke test of all 7 areas + photo upload incl. HEIC","status":"blocked","depends_on":["T085"],"notes":""}
-{"id":"T090","phase":"8-docs","title":"README: local dev, seed, deploy, feature flag, architecture","status":"todo","depends_on":["T004"],"notes":""}
-{"id":"T091","phase":"8-docs","title":"Mobile acceptance checklist run-through (spec s41)","status":"blocked","depends_on":["T086"],"notes":"OPERATOR: needs a real iPhone/Android"}
+{"id":"T082","phase":"7-deploy","title":"First deploy to Railway + generate public domain","status":"done","depends_on":["T016","T080"],"notes":""}
+{"id":"T083","phase":"7-deploy","title":"Configure Neon Auth trusted origin/callback to Railway domain, set APP_URL, redeploy","status":"done","depends_on":["T082"],"notes":""}
+{"id":"T084","phase":"7-deploy","title":"Run production migrations + seed","status":"done","depends_on":["T082"],"notes":""}
+{"id":"T085","phase":"7-deploy","title":"End-to-end magic-link login test in production","status":"in_progress","depends_on":["T083","T084"],"notes":"Magic link send/verify wired; needs Ryan to complete a real sign-in from his phone"}
+{"id":"T086","phase":"7-deploy","title":"Production smoke test of all 7 areas + photo upload incl. HEIC","status":"blocked","depends_on":["T085"],"notes":"Needs a signed-in session on a real phone"}
+{"id":"T090","phase":"8-docs","title":"README: local dev, seed, deploy, feature flag, architecture","status":"done","depends_on":["T004"],"notes":""}
+{"id":"T091","phase":"8-docs","title":"Mobile acceptance checklist run-through (spec s41)","status":"blocked","depends_on":["T086"],"notes":"Needs a signed-in session on a real phone"}
