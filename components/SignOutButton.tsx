@@ -17,7 +17,7 @@ export function SignOutButton({ className = "" }: { className?: string }) {
           void signOut();
         });
       }}
-      className={`tap rounded-2xl border border-line bg-card px-4 py-3 text-base font-bold text-clay transition active:bg-paper disabled:opacity-50 ${className}`}
+      className={`tap rounded-xl border border-line bg-card px-4 py-3 text-[0.9375rem] font-extrabold tracking-tight text-clay transition-colors hover:border-clay/40 hover:bg-clay/5 active:bg-clay/10 disabled:opacity-50 ${className}`}
     >
       {pending ? "Signing out…" : "Sign out"}
     </button>

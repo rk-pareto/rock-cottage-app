@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { DogSection, type LatestEvent } from "@/components/dogs/DogSection";
+import { PageHeader } from "@/components/ui/Card";
 import type { SheetEvent } from "@/components/dogs/EventSheet";
 import { requireMember } from "@/lib/auth/membership";
 import { getDogStatuses, getRecentEvents } from "@/lib/dogs";
@@ -45,10 +46,10 @@ export default async function DogsPage() {
 
   return (
     <>
-      <h1 className="mb-1 font-display text-3xl font-semibold text-ink">
-        {features.junoEnabled ? "Dogs" : "Alice"}
-      </h1>
-      <p className="mb-6 text-sm text-muted">One tap. It records right now, under your name.</p>
+      <PageHeader
+        title={features.junoEnabled ? "Dogs" : "Alice"}
+        subtitle="One tap. It records right now, under your name."
+      />
 
       {sections.length === 0 ? (
         <p className="text-sm text-muted">No dogs are set up yet. Run the seed.</p>

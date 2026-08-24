@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { requireMember } from "@/lib/auth/membership";
+import { PageHeader } from "@/components/ui/Card";
 import { getPhotos, withThumbnailUrls } from "@/lib/photos";
 import { isStorageConfigured } from "@/lib/storage/s3";
 import { PhotosClient } from "./PhotosClient";
@@ -13,8 +14,7 @@ export default async function PhotosPage() {
 
   return (
     <>
-      <h1 className="mb-1 font-display text-3xl font-semibold text-ink">Photos</h1>
-      <p className="mb-4 text-sm text-muted">Everyone&apos;s pictures from the week.</p>
+      <PageHeader title="Photos" subtitle="Everyone&rsquo;s pictures from the week." />
       <PhotosClient
         photos={rows.map((r) => ({
           id: r.id,

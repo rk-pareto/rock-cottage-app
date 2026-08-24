@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
+import { EmptyWell } from "@/components/ui/Card";
 import {
   addBringingItem,
   deleteBringingItem,
@@ -114,41 +115,45 @@ export function BringingClient({
   return (
     <>
       {showAdd ? (
-        <form onSubmit={submit} className="mb-6 flex flex-col gap-3 rounded-3xl border border-line bg-card p-4">
+        <form
+          onSubmit={submit}
+          className="mb-6 flex flex-col gap-2.5 rounded-2xl border border-line bg-card p-4"
+        >
+          <p className="label mb-0.5 text-muted">{editingId ? "Edit item" : "New item"}</p>
           <input
             autoFocus
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Ketchup"
             maxLength={200}
-            className="tap rounded-2xl border border-line bg-paper px-4 py-3 text-base text-ink outline-none focus:border-pine"
+            className="tap rounded-xl border border-line bg-paper px-4 py-3 text-base text-ink outline-none transition-colors placeholder:text-muted focus:border-ink"
           />
           <input
             value={category}
             onChange={(e) => setCategory(e.target.value)}
             placeholder="Category (optional) — Condiments, Cooking…"
             maxLength={80}
-            className="tap rounded-2xl border border-line bg-paper px-4 py-3 text-base text-ink outline-none focus:border-pine"
+            className="tap rounded-xl border border-line bg-paper px-4 py-3 text-base text-ink outline-none transition-colors placeholder:text-muted focus:border-ink"
           />
           <input
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Notes (optional)"
             maxLength={2000}
-            className="tap rounded-2xl border border-line bg-paper px-4 py-3 text-base text-ink outline-none focus:border-pine"
+            className="tap rounded-xl border border-line bg-paper px-4 py-3 text-base text-ink outline-none transition-colors placeholder:text-muted focus:border-ink"
           />
-          <div className="flex gap-2">
+          <div className="mt-1 flex gap-2">
             <button
               type="submit"
               disabled={busy || name.trim().length === 0}
-              className="tap flex-1 rounded-2xl bg-pine px-4 py-3 text-base font-bold text-white active:bg-pine-dark disabled:opacity-50"
+              className="tap flex-1 rounded-xl bg-ink px-4 py-3 text-[0.9375rem] font-extrabold tracking-tight text-paper transition active:scale-[0.99] disabled:opacity-30"
             >
               {busy ? "Saving…" : editingId ? "Save" : "Add"}
             </button>
             <button
               type="button"
               onClick={resetForm}
-              className="tap rounded-2xl px-4 py-3 text-base font-bold text-muted"
+              className="tap rounded-xl px-4 py-3 text-[0.9375rem] font-extrabold tracking-tight text-ink-soft transition-colors active:bg-subtle"
             >
               Cancel
             </button>
@@ -158,50 +163,61 @@ export function BringingClient({
         <button
           type="button"
           onClick={() => setShowAdd(true)}
-          className="tap mb-6 w-full rounded-2xl bg-pine px-4 py-3.5 text-base font-bold text-white active:bg-pine-dark"
+          className="tap mb-6 flex w-full items-center justify-center gap-2 rounded-xl bg-ink px-4 py-3.5 text-[0.9375rem] font-extrabold tracking-tight text-paper transition active:scale-[0.99]"
         >
-          + Add something I&apos;m bringing
+          <span aria-hidden="true" className="text-lg leading-none">
+            +
+          </span>
+          Add something I&apos;m bringing
         </button>
       )}
 
       {rows.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-line px-4 py-8 text-center text-sm text-muted">
+        <EmptyWell>
           Nobody&apos;s claimed anything yet. Claim the ketchup before someone else does.
-        </p>
+        </EmptyWell>
       ) : (
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-7">
           {sortedGroups.map(([groupName, items]) => (
             <section key={groupName}>
-              <h2 className="mb-2 font-display text-lg font-semibold text-ink">{groupName}</h2>
-              <ul className="flex flex-col gap-2">
+              <div className="mb-2.5 flex items-center gap-3">
+                <h2 className="label shrink-0 text-muted">{groupName}</h2>
+                <span aria-hidden="true" className="h-px flex-1 bg-line" />
+                <span className="shrink-0 text-xs font-bold text-muted">{items.length}</span>
+              </div>
+              <ul className="overflow-hidden rounded-2xl border border-line">
                 {items.map((row) => (
-                  <li key={row.id} className="rounded-2xl border border-line bg-card">
+                  <li key={row.id} className="border-b border-line bg-card last:border-b-0">
                     <div className="flex items-center gap-3 p-3">
                       {canEdit(row) ? (
                         <button
                           type="button"
                           aria-label={row.packed ? `Unmark ${row.name} packed` : `Mark ${row.name} packed`}
                           onClick={() => togglePacked(row)}
-                          className={`tap flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-lg font-bold ${
+                          className={`tap flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors ${
                             row.packed
                               ? "bg-pine text-white"
-                              : "border-2 border-line text-transparent"
+                              : "border border-line-strong text-transparent active:bg-subtle"
                           }`}
                         >
-                          ✓
+                          <Check />
                         </button>
                       ) : (
                         <div
                           aria-hidden="true"
-                          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-lg font-bold ${
-                            row.packed ? "bg-pine/30 text-white" : "border-2 border-line text-transparent"
+                          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${
+                            row.packed
+                              ? "bg-pine/12 text-pine"
+                              : "border border-line-strong text-transparent"
                           }`}
                         >
-                          ✓
+                          <Check />
                         </div>
                       )}
                       <div className="min-w-0 flex-1">
-                        <p className={`truncate font-bold ${row.packed ? "text-muted line-through" : "text-ink"}`}>
+                        <p
+                          className={`truncate text-[0.9375rem] font-bold ${row.packed ? "text-muted line-through" : "text-ink"}`}
+                        >
                           {row.name}
                         </p>
                         <p className="truncate text-xs text-muted">
@@ -214,14 +230,14 @@ export function BringingClient({
                           <button
                             type="button"
                             onClick={() => beginEdit(row)}
-                            className="tap rounded-lg px-2 text-sm font-bold text-lake"
+                            className="tap rounded-lg px-2 text-xs font-bold text-ink-soft transition-colors hover:text-ink"
                           >
                             Edit
                           </button>
                           <button
                             type="button"
                             onClick={() => setConfirmingId(row.id)}
-                            className="tap rounded-lg px-2 text-sm font-bold text-clay"
+                            className="tap rounded-lg px-2 text-xs font-bold text-muted transition-colors hover:text-clay"
                           >
                             Delete
                           </button>
@@ -229,19 +245,21 @@ export function BringingClient({
                       ) : null}
                     </div>
                     {confirmingId === row.id ? (
-                      <div className="flex flex-wrap items-center gap-2 border-t border-line bg-paper p-2">
-                        <span className="flex-1 text-sm text-ink">Delete “{row.name}”?</span>
+                      <div className="flex flex-wrap items-center gap-2 border-t border-line bg-subtle p-2.5">
+                        <span className="flex-1 text-sm text-ink">
+                          Delete &ldquo;{row.name}&rdquo;?
+                        </span>
                         <button
                           type="button"
                           onClick={() => remove(row)}
-                          className="tap rounded-xl bg-clay px-4 py-2 text-sm font-bold text-white"
+                          className="tap rounded-lg bg-clay px-4 py-2 text-xs font-extrabold text-white"
                         >
                           Delete
                         </button>
                         <button
                           type="button"
                           onClick={() => setConfirmingId(null)}
-                          className="tap rounded-xl px-3 py-2 text-sm font-bold text-muted"
+                          className="tap rounded-lg px-3 py-2 text-xs font-extrabold text-ink-soft"
                         >
                           Keep
                         </button>
@@ -255,5 +273,23 @@ export function BringingClient({
         </div>
       )}
     </>
+  );
+}
+
+/** A drawn tick, so the checkbox doesn't depend on a text glyph's metrics. */
+function Check() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2.4}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="m5 12.5 4.5 4.5L19 7" />
+    </svg>
   );
 }

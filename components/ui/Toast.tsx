@@ -35,8 +35,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`pointer-events-auto max-w-[min(28rem,100%)] rounded-2xl px-4 py-3 text-sm font-semibold text-white shadow-lg ${
-              t.tone === "error" ? "bg-clay" : "bg-pine"
+            className={`pointer-events-auto max-w-[min(28rem,100%)] rounded-xl px-4 py-2.5 text-sm font-bold tracking-tight text-white shadow-[0_8px_24px_-6px_rgba(14,18,22,0.45)] ${
+              t.tone === "error" ? "bg-clay" : "bg-ink"
             }`}
           >
             {t.message}

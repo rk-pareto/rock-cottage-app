@@ -18,26 +18,70 @@ export type DogSectionProps = {
   currentMemberName: string;
 };
 
-const ACTIONS: { type: PetEventType; label: (name: string) => string; status: string; tone: string }[] = [
+const ACTIONS: {
+  type: PetEventType;
+  label: (name: string) => string;
+  status: string;
+  tone: string;
+  icon: React.ReactNode;
+}[] = [
   {
     type: "outside",
-    label: (n) => `LET ${n.toUpperCase()} OUT`,
+    label: (n) => `Let ${n} out`,
     status: "Last outside",
     tone: "bg-pine active:bg-pine-dark",
+    icon: (
+      <ActionIcon>
+        <path d="M4 12h11" />
+        <path d="M11.5 8.5 15 12l-3.5 3.5" />
+        <path d="M15.5 4.5H19a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-3.5" />
+      </ActionIcon>
+    ),
   },
   {
     type: "poop",
-    label: (n) => `${n.toUpperCase()} POOPED`,
+    label: (n) => `${n} pooped`,
     status: "Last poop",
     tone: "bg-amber active:bg-clay",
+    icon: (
+      <ActionIcon>
+        <path d="M9 8.5a2.5 2.5 0 0 1 4.4-1.6" />
+        <path d="M7 13a2.5 2.5 0 0 1 .4-4.4" />
+        <path d="M5.5 18.5h13a2.5 2.5 0 0 0 0-5h-1a2.5 2.5 0 0 0-2.2-3.7H9.7A2.5 2.5 0 0 0 7.5 13.5h-2a2.5 2.5 0 0 0 0 5Z" />
+      </ActionIcon>
+    ),
   },
   {
     type: "fed",
-    label: (n) => `FED ${n.toUpperCase()}`,
+    label: (n) => `Fed ${n}`,
     status: "Last fed",
     tone: "bg-lake active:bg-pine-dark",
+    icon: (
+      <ActionIcon>
+        <path d="M4.5 11h15a7.5 7.5 0 0 1-7.5 7.5A7.5 7.5 0 0 1 4.5 11Z" />
+        <path d="M3.5 18.5h17" />
+        <path d="M9 7.5c0-1 1-1.4 1-2.4M13 7.5c0-1 1-1.4 1-2.4" />
+      </ActionIcon>
+    ),
   },
 ];
+
+function ActionIcon({ children }: { children: React.ReactNode }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="h-5 w-5 shrink-0"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.7}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {children}
+    </svg>
+  );
+}
 
 export function DogSection({ slug, name, latest, recent, currentMemberName }: DogSectionProps) {
   const toast = useToast();
@@ -73,41 +117,43 @@ export function DogSection({ slug, name, latest, recent, currentMemberName }: Do
   }
 
   return (
-    <section className="mb-8">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="font-display text-2xl font-semibold text-ink">{name}</h2>
+    <section className="mb-10">
+      <div className="mb-4 flex items-center justify-between gap-3 border-b border-line pb-3">
+        <h2 className="font-display text-[1.75rem] leading-none text-ink">{name}</h2>
         <button
           type="button"
           onClick={() => setSheetOpen(true)}
-          className="tap rounded-xl border border-line bg-card px-4 py-2 text-sm font-bold text-muted active:bg-paper"
+          className="tap rounded-lg px-3 py-2 text-xs font-bold text-ink-soft transition-colors hover:text-ink active:bg-subtle"
         >
-          EDIT
+          History
         </button>
       </div>
 
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-4">
         {ACTIONS.map((action) => {
           const value = optimistic[action.type] ?? latest[action.type];
           const busy = pendingType === action.type;
           return (
-            <div key={action.type} className="flex flex-col gap-2">
-              {/* The raised, full-colour pill is the button; the status line
-                  below sits outside it so it never reads as a card header. */}
+            <div key={action.type} className="flex flex-col gap-1.5">
+              {/* Still the biggest thing on the screen — the flourish is gone,
+                  the target isn't. */}
               <button
                 type="button"
                 onClick={() => handleTap(action.type)}
                 disabled={Boolean(pendingType)}
-                className={`tap flex w-full items-center justify-between gap-3 rounded-full px-6 py-5 text-lg font-extrabold tracking-wide text-white shadow-[0_3px_0_rgba(38,32,26,0.22)] transition active:translate-y-[3px] active:shadow-none disabled:opacity-70 ${action.tone}`}
+                className={`tap flex w-full items-center gap-3 rounded-xl px-5 py-4 text-left text-[1.0625rem] font-extrabold tracking-tight text-white transition active:scale-[0.995] disabled:opacity-60 ${action.tone}`}
               >
-                <span>{busy ? "…" : action.label(name)}</span>
-                <span aria-hidden="true" className="text-2xl leading-none opacity-80">
+                {action.icon}
+                <span className="flex-1">{busy ? "Recording…" : action.label(name)}</span>
+                <span
+                  aria-hidden="true"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/20 text-lg leading-none"
+                >
                   +
                 </span>
               </button>
-              <p className="flex flex-wrap items-baseline gap-x-2 px-2 text-sm">
-                <span className="text-xs font-bold uppercase tracking-wide text-muted">
-                  {action.status}
-                </span>
+              <p className="flex flex-wrap items-baseline gap-x-2 px-1 text-sm">
+                <span className="label text-muted">{action.status}</span>
                 {value ? (
                   <>
                     <span className="font-bold text-ink">

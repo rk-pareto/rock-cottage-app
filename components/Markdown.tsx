@@ -12,19 +12,21 @@ export function Markdown({ children }: { children: string }) {
         remarkPlugins={[remarkGfm]}
         components={{
           h1: ({ children }) => (
-            <h1 className="font-display text-2xl font-semibold text-ink">{children}</h1>
+            <h1 className="font-display text-[2rem] leading-tight text-ink">{children}</h1>
           ),
           h2: ({ children }) => (
-            <h2 className="mt-2 font-display text-xl font-semibold text-ink">{children}</h2>
+            <h2 className="mt-4 text-base font-extrabold tracking-tight text-ink">{children}</h2>
           ),
           h3: ({ children }) => (
-            <h3 className="mt-2 font-display text-lg font-semibold text-ink">{children}</h3>
+            <h3 className="mt-3 label text-muted">{children}</h3>
           ),
-          p: ({ children }) => <p className="text-base leading-relaxed text-ink">{children}</p>,
+          p: ({ children }) => (
+            <p className="text-[0.9375rem] leading-relaxed text-ink-soft">{children}</p>
+          ),
           a: ({ href, children }) => (
             <a
               href={href}
-              className="font-semibold text-lake underline underline-offset-2"
+              className="font-bold text-lake underline decoration-lake/30 underline-offset-[3px] transition-colors hover:decoration-lake"
               target={href?.startsWith("http") ? "_blank" : undefined}
               rel={href?.startsWith("http") ? "noreferrer" : undefined}
             >
@@ -32,18 +34,22 @@ export function Markdown({ children }: { children: string }) {
             </a>
           ),
           ul: ({ children }) => (
-            <ul className="flex list-disc flex-col gap-1 pl-5 text-base text-ink">{children}</ul>
+            <ul className="flex list-disc flex-col gap-1.5 pl-5 text-[0.9375rem] text-ink-soft marker:text-line-strong">
+              {children}
+            </ul>
           ),
           ol: ({ children }) => (
-            <ol className="flex list-decimal flex-col gap-1 pl-5 text-base text-ink">{children}</ol>
+            <ol className="flex list-decimal flex-col gap-1.5 pl-5 text-[0.9375rem] text-ink-soft marker:text-muted">
+              {children}
+            </ol>
           ),
           blockquote: ({ children }) => (
-            <blockquote className="rounded-2xl border-l-4 border-amber bg-card px-4 py-3 text-sm text-muted">
+            <blockquote className="border-l-2 border-ink pl-4 text-[0.9375rem] text-ink">
               {children}
             </blockquote>
           ),
           code: ({ children }) => (
-            <code className="rounded bg-card px-1.5 py-0.5 font-mono text-sm text-ink">
+            <code className="rounded-md bg-subtle px-1.5 py-0.5 font-mono text-[0.8125rem] text-ink">
               {children}
             </code>
           ),
@@ -55,10 +61,10 @@ export function Markdown({ children }: { children: string }) {
             </div>
           ),
           th: ({ children }) => (
-            <th className="border-b border-line px-2 py-2 font-bold text-ink">{children}</th>
+            <th className="label border-b border-line-strong px-2 py-2 text-muted">{children}</th>
           ),
           td: ({ children }) => (
-            <td className="border-b border-line px-2 py-2 align-top text-ink">{children}</td>
+            <td className="border-b border-line px-2 py-2.5 align-top text-ink-soft">{children}</td>
           ),
         }}
       >

@@ -52,7 +52,7 @@ export function SignInForm() {
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
       <label className="flex flex-col gap-2">
-        <span className="text-sm font-semibold text-ink">Email</span>
+        <span className="label text-muted">Email</span>
         <input
           type="email"
           name="email"
@@ -63,21 +63,21 @@ export function SignInForm() {
           placeholder="you@example.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="tap rounded-2xl border border-line bg-card px-4 py-3 text-base text-ink outline-none focus:border-pine"
+          className="tap rounded-xl border border-line bg-card px-4 py-3 text-base text-ink outline-none transition-colors placeholder:text-muted focus:border-ink"
         />
       </label>
 
-      {error ? <p className="text-sm font-semibold text-clay">{error}</p> : null}
+      {error ? <p className="text-sm font-bold text-clay">{error}</p> : null}
 
       <button
         type="submit"
         disabled={pending || email.trim().length === 0}
-        className="tap rounded-2xl bg-pine px-4 py-3.5 text-base font-bold text-white transition active:bg-pine-dark disabled:opacity-50"
+        className="tap rounded-xl bg-ink px-4 py-3.5 text-[0.9375rem] font-extrabold tracking-tight text-paper transition active:scale-[0.99] disabled:opacity-30"
       >
         {pending ? "Sending…" : "Email me a sign-in link"}
       </button>
 
-      <p className="text-center text-xs text-muted">
+      <p className="text-xs text-muted">
         Rock Cottage is private. Only the five of us can get in.
       </p>
     </form>

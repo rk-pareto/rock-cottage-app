@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Card, EmptyState, SectionHeading } from "@/components/ui/Card";
+import { Card, EmptyState, SectionLabel } from "@/components/ui/Card";
 import { RelativeTime } from "@/components/ui/RelativeTime";
 import { requireMember } from "@/lib/auth/membership";
 import { getDogStatuses } from "@/lib/dogs";
@@ -49,21 +49,16 @@ export default async function HomePage() {
   const today = cottageToday();
 
   return (
-    <div className="flex flex-col gap-5">
-      <header>
-        <p className="text-sm font-semibold text-amber">{formatLongDate(today)}</p>
-        <h1 className="font-display text-3xl font-semibold text-ink">
-          Hey {member.displayName} 👋
+    <div className="flex flex-col gap-8">
+      <header className="border-b border-line pb-5">
+        <p className="label text-muted">{formatLongDate(today)}</p>
+        <h1 className="mt-2 font-display text-[2.25rem] leading-[1.05] text-ink">
+          Hey {member.displayName}
         </h1>
       </header>
 
       <section className="flex flex-col gap-3">
-        <div className="flex items-baseline justify-between gap-3">
-          <h2 className="font-display text-lg font-semibold text-ink">Coming up</h2>
-          <Link href="/meals" className="shrink-0 text-sm font-semibold text-lake">
-            See all
-          </Link>
-        </div>
+        <SectionLabel href="/meals">Coming up</SectionLabel>
 
         {feed.length === 0 ? (
           <Card>
@@ -81,19 +76,23 @@ export default async function HomePage() {
       </section>
 
       {dogs.map((dog) => (
-        <Card key={dog.id}>
-          <SectionHeading href="/dogs" action="Open">
+        <section key={dog.id} className="flex flex-col gap-3">
+          <SectionLabel href="/dogs" action="Open">
             {dog.name}
-          </SectionHeading>
-          <ul className="flex flex-col gap-1.5">
+          </SectionLabel>
+          {/* A ledger, not a card: label left, value right, hairline between. */}
+          <ul className="flex flex-col">
             {(["outside", "poop", "fed"] as PetEventType[]).map((type) => {
               const event = dog.latest[type];
               return (
-                <li key={type} className="flex flex-wrap items-baseline gap-x-2 text-sm">
-                  <span className="w-16 shrink-0 font-bold text-ink">{DOG_LABEL[type]}</span>
+                <li
+                  key={type}
+                  className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 border-b border-line py-2.5 last:border-b-0"
+                >
+                  <span className="text-sm font-bold text-ink">{DOG_LABEL[type]}</span>
                   {event ? (
-                    <span className="text-muted">
-                      <span className="font-semibold text-ink">
+                    <span className="text-sm text-muted">
+                      <span className="font-semibold text-ink-soft">
                         <RelativeTime
                           iso={event.occurredAt.toISOString()}
                           initial={relativeTime(event.occurredAt)}
@@ -103,73 +102,82 @@ export default async function HomePage() {
                       {event.recordedBy}
                     </span>
                   ) : (
-                    <span className="text-muted">Nothing recorded yet</span>
+                    <span className="text-sm text-muted">Nothing recorded yet</span>
                   )}
                 </li>
               );
             })}
           </ul>
-        </Card>
+        </section>
       ))}
 
-      <Card>
-        <SectionHeading href="/shopping">
-          {shopping.length > 0 ? `Need from town — ${shopping.length}` : "Shopping"}
-        </SectionHeading>
+      <section className="flex flex-col gap-3">
+        <SectionLabel href="/shopping">
+          {shopping.length > 0 ? `Need from town · ${shopping.length}` : "Shopping"}
+        </SectionLabel>
         {shopping.length === 0 ? (
           <EmptyState>Nothing needed from town.</EmptyState>
         ) : (
-          <ul className="flex flex-col gap-1">
+          <ul className="flex flex-col">
             {shopping.slice(0, 5).map((item) => (
-              <li key={item.id} className="flex items-baseline justify-between gap-3 text-sm">
-                <span className="min-w-0 truncate font-semibold text-ink">{item.name}</span>
-                <span className="shrink-0 text-muted">{item.requestedBy}</span>
+              <li
+                key={item.id}
+                className="flex items-baseline justify-between gap-4 border-b border-line py-2.5 last:border-b-0"
+              >
+                <span className="min-w-0 truncate text-sm font-bold text-ink">{item.name}</span>
+                <span className="shrink-0 text-sm text-muted">{item.requestedBy}</span>
               </li>
             ))}
             {shopping.length > 5 ? (
-              <li className="pt-1 text-sm text-muted">+ {shopping.length - 5} more</li>
+              <li className="pt-2.5 text-sm text-muted">+ {shopping.length - 5} more</li>
             ) : null}
           </ul>
         )}
-      </Card>
+      </section>
 
       {/* Photos are woven into the feed above; this covers the case where
           there were none to weave in. */}
       {photos.length === 0 ? (
-        <Card>
-          <SectionHeading href="/photos" action="View all">
+        <section className="flex flex-col gap-3">
+          <SectionLabel href="/photos" action="View all">
             Photos
-          </SectionHeading>
+          </SectionLabel>
           <EmptyState>
             {storageReady
               ? "No photos yet. Someone go take a picture of the lake."
               : "Photo storage isn't set up yet."}
           </EmptyState>
-        </Card>
+        </section>
       ) : null}
     </div>
   );
 }
 
 function UpcomingMealCard({ meal, today }: { meal: MealRow; today: string }) {
-  const day = meal.mealDate === today ? "Today" : formatLongDate(meal.mealDate).split(",")[0];
+  const isToday = meal.mealDate === today;
+  const day = isToday ? "Today" : formatLongDate(meal.mealDate).split(",")[0];
 
   return (
-    <Card>
+    <Card className="transition-colors active:bg-subtle">
       <Link href="/meals" className="block">
-        <p className="text-xs font-bold uppercase tracking-widest text-amber">
-          {day}
-          {" · "}
-          {MEAL_LABEL[meal.mealType] ?? meal.mealType}
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className={`label ${isToday ? "text-ink" : "text-muted"}`}>{day}</span>
+          <span aria-hidden="true" className="h-3 w-px bg-line-strong" />
+          <span className="label text-muted">
+            {MEAL_LABEL[meal.mealType] ?? meal.mealType}
+          </span>
         </p>
-        <h3 className="mt-0.5 font-display text-lg font-semibold text-ink">{meal.title}</h3>
+        <h3 className="mt-2 font-display text-[1.5rem] leading-tight text-ink">{meal.title}</h3>
         {meal.displayDescription ? (
-          <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-muted italic">
+          <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-muted">
             {meal.displayDescription}
           </p>
         ) : null}
-        <p className="mt-2 text-sm text-muted">
-          {meal.responsible.length > 0 ? meal.responsible.join(" & ") : "Everyone"}
+        <p className="mt-3 border-t border-line pt-2.5 text-sm text-ink-soft">
+          <span className="text-muted">Cooking</span>{" "}
+          <span className="font-bold text-ink">
+            {meal.responsible.length > 0 ? meal.responsible.join(" & ") : "Everyone"}
+          </span>
         </p>
       </Link>
     </Card>
@@ -185,24 +193,21 @@ function PhotoBreak({ photo }: { photo: PhotoCard }) {
   const portrait = photo.width && photo.height ? photo.height > photo.width : false;
 
   return (
-    <Link
-      href="/photos"
-      className="block overflow-hidden rounded-3xl border border-line bg-card shadow-[0_1px_2px_rgba(38,32,26,0.06)]"
-    >
-      <div className={`w-full bg-line ${portrait ? "aspect-[4/5]" : "aspect-[4/3]"}`}>
+    <Link href="/photos" className="group block overflow-hidden rounded-2xl">
+      <div className={`w-full overflow-hidden rounded-2xl bg-subtle ${portrait ? "aspect-[4/5]" : "aspect-[4/3]"}`}>
         {photo.thumbnailUrl ? (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
             src={photo.thumbnailUrl}
             alt={`Uploaded by ${photo.uploadedBy}`}
             loading="lazy"
-            className="h-full w-full object-cover"
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
           />
         ) : null}
       </div>
-      <p className="flex flex-wrap items-baseline gap-x-2 px-4 py-2.5 text-xs text-muted">
-        <span className="font-bold uppercase tracking-widest text-pine">From the week</span>
-        <span>
+      <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 pt-2 text-xs">
+        <span className="label text-muted">From the week</span>
+        <span className="text-muted">
           {photo.uploadedBy}
           {" · "}
           <RelativeTime

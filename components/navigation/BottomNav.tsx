@@ -8,14 +8,14 @@ type Item = { href: string; label: string; icon: React.ReactNode };
 const stroke = {
   fill: "none",
   stroke: "currentColor",
-  strokeWidth: 1.9,
+  strokeWidth: 1.6,
   strokeLinecap: "round" as const,
   strokeLinejoin: "round" as const,
 };
 
 function Icon({ children }: { children: React.ReactNode }) {
   return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" aria-hidden="true" {...stroke}>
+    <svg viewBox="0 0 24 24" className="h-[22px] w-[22px]" aria-hidden="true" {...stroke}>
       {children}
     </svg>
   );
@@ -73,9 +73,9 @@ export function BottomNav({ dogsLabel }: { dogsLabel: string }) {
       label: "More",
       icon: (
         <Icon>
-          <circle cx="5.5" cy="12" r="1.4" />
-          <circle cx="12" cy="12" r="1.4" />
-          <circle cx="18.5" cy="12" r="1.4" />
+          <circle cx="5.5" cy="12" r="1.3" />
+          <circle cx="12" cy="12" r="1.3" />
+          <circle cx="18.5" cy="12" r="1.3" />
         </Icon>
       ),
     },
@@ -85,7 +85,7 @@ export function BottomNav({ dogsLabel }: { dogsLabel: string }) {
   const moreRoutes = ["/shopping", "/bringing", "/info", "/account", "/more"];
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-card/95 backdrop-blur safe-bottom">
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-card/80 backdrop-blur-xl safe-bottom">
       <ul className="mx-auto flex max-w-3xl items-stretch">
         {items.map((item) => {
           const active =
@@ -99,12 +99,24 @@ export function BottomNav({ dogsLabel }: { dogsLabel: string }) {
               <Link
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                className={`tap flex flex-col items-center justify-center gap-0.5 py-2 transition-colors active:bg-paper ${
-                  active ? "text-pine" : "text-muted"
+                className={`tap relative flex flex-col items-center justify-center gap-1 py-2.5 transition-colors active:bg-subtle ${
+                  active ? "text-ink" : "text-muted"
                 }`}
               >
+                {/* The active tab is marked by a rule that meets the nav's own
+                    top border — the same hairline language as the sections. */}
+                <span
+                  aria-hidden="true"
+                  className={`absolute inset-x-0 -top-px mx-auto h-0.5 w-8 rounded-full bg-pine transition-opacity ${
+                    active ? "opacity-100" : "opacity-0"
+                  }`}
+                />
                 {item.icon}
-                <span className="text-[11px] font-bold tracking-tight">{item.label}</span>
+                <span
+                  className={`text-[10.5px] tracking-tight ${active ? "font-extrabold" : "font-semibold"}`}
+                >
+                  {item.label}
+                </span>
               </Link>
             </li>
           );

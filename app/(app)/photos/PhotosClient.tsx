@@ -166,21 +166,24 @@ export function PhotosClient({
         type="button"
         disabled={!storageReady}
         onClick={() => fileInput.current?.click()}
-        className="tap mb-4 w-full rounded-2xl bg-pine px-4 py-3.5 text-base font-bold text-white active:bg-pine-dark disabled:opacity-50"
+        className="tap mb-5 flex w-full items-center justify-center gap-2 rounded-xl bg-ink px-4 py-3.5 text-[0.9375rem] font-extrabold tracking-tight text-paper transition active:scale-[0.99] disabled:opacity-30"
       >
-        {storageReady ? "＋ Add photos" : "Photo storage isn't set up yet"}
+        <span aria-hidden="true" className="text-lg leading-none">
+          +
+        </span>
+        {storageReady ? "Add photos" : "Photo storage isn't set up yet"}
       </button>
 
       {activeUploads.length > 0 ? (
-        <ul className="mb-4 flex flex-col gap-2">
+        <ul className="mb-5 overflow-hidden rounded-xl border border-line">
           {activeUploads.map((upload) => (
             <li
               key={upload.key}
-              className="flex items-center gap-3 rounded-2xl border border-line bg-card px-3 py-2 text-sm"
+              className="flex items-center gap-3 border-b border-line bg-card px-3 py-2.5 text-sm last:border-b-0"
             >
               <span className="min-w-0 flex-1 truncate text-ink">{upload.name}</span>
               <span
-                className={`shrink-0 font-bold ${
+                className={`label shrink-0 ${
                   upload.stage === "failed" ? "text-clay" : "text-muted"
                 }`}
               >
@@ -196,29 +199,29 @@ export function PhotosClient({
       ) : null}
 
       {photos.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-line px-4 py-10 text-center text-sm text-muted">
+        <p className="rounded-2xl border border-dashed border-line-strong px-6 py-14 text-center text-sm text-muted">
           No photos yet. Someone go take a picture of the lake.
         </p>
       ) : (
-        <ul className="grid grid-cols-3 gap-1.5">
+        <ul className="grid grid-cols-3 gap-1">
           {photos.map((photo) => (
             <li key={photo.id} className="aspect-square">
               {photo.thumbnailUrl ? (
                 <button
                   type="button"
                   onClick={() => setLightboxId(photo.id)}
-                  className="h-full w-full overflow-hidden rounded-xl bg-line"
+                  className="group h-full w-full overflow-hidden rounded-lg bg-subtle"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={photo.thumbnailUrl}
                     alt={`Uploaded by ${photo.uploadedBy}`}
                     loading="lazy"
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
                   />
                 </button>
               ) : (
-                <div className="flex h-full w-full flex-col items-center justify-center rounded-xl border border-dashed border-line p-1 text-center">
+                <div className="flex h-full w-full flex-col items-center justify-center rounded-lg border border-dashed border-line-strong p-1 text-center">
                   <span className="text-[10px] font-bold text-muted">
                     {photo.processingStatus === "failed" ? "No preview" : "Processing…"}
                   </span>
@@ -239,15 +242,19 @@ export function PhotosClient({
       )}
 
       {lightboxPhoto ? (
-        <div className="fixed inset-0 z-50 flex flex-col bg-ink/95" role="dialog" aria-modal="true">
-          <div className="flex items-center justify-between p-3 text-white">
-            <span className="min-w-0 truncate text-sm">
+        <div
+          className="fixed inset-0 z-50 flex flex-col bg-ink/95 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="flex items-center justify-between gap-3 p-3 text-white">
+            <span className="label min-w-0 truncate text-white/60">
               {lightboxPhoto.uploadedBy}
             </span>
             <button
               type="button"
               onClick={() => setLightboxId(null)}
-              className="tap rounded-xl px-3 py-2 text-sm font-bold"
+              className="tap rounded-lg px-3 py-2 text-xs font-extrabold text-white/80 transition-colors hover:text-white"
             >
               Close
             </button>
@@ -265,13 +272,13 @@ export function PhotosClient({
           <div className="flex flex-wrap gap-2 p-3 safe-bottom">
             <a
               href={`/api/photos/${lightboxPhoto.id}/download?variant=display`}
-              className="tap flex-1 rounded-2xl bg-white/15 px-4 py-3 text-center text-sm font-bold text-white"
+              className="tap flex-1 rounded-xl bg-white/12 px-4 py-3 text-center text-xs font-extrabold tracking-tight text-white transition-colors hover:bg-white/20"
             >
               Download optimized
             </a>
             <a
               href={`/api/photos/${lightboxPhoto.id}/download?variant=original`}
-              className="tap flex-1 rounded-2xl bg-white/15 px-4 py-3 text-center text-sm font-bold text-white"
+              className="tap flex-1 rounded-xl bg-white/12 px-4 py-3 text-center text-xs font-extrabold tracking-tight text-white transition-colors hover:bg-white/20"
             >
               Download original
             </a>
@@ -281,14 +288,14 @@ export function PhotosClient({
                   <button
                     type="button"
                     onClick={() => remove(lightboxPhoto)}
-                    className="tap flex-1 rounded-2xl bg-clay px-4 py-3 text-sm font-bold text-white"
+                    className="tap flex-1 rounded-xl bg-clay px-4 py-3 text-xs font-extrabold tracking-tight text-white"
                   >
                     Delete for everyone
                   </button>
                   <button
                     type="button"
                     onClick={() => setConfirmingId(null)}
-                    className="tap rounded-2xl px-4 py-3 text-sm font-bold text-white/70"
+                    className="tap rounded-xl px-4 py-3 text-xs font-extrabold tracking-tight text-white/70"
                   >
                     Keep
                   </button>
@@ -297,7 +304,7 @@ export function PhotosClient({
                 <button
                   type="button"
                   onClick={() => setConfirmingId(lightboxPhoto.id)}
-                  className="tap w-full rounded-2xl border border-white/25 px-4 py-3 text-sm font-bold text-white/80"
+                  className="tap w-full rounded-xl border border-white/20 px-4 py-3 text-xs font-extrabold tracking-tight text-white/70 transition-colors hover:text-white"
                 >
                   Delete
                 </button>

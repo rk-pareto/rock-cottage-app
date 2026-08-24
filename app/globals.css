@@ -1,24 +1,29 @@
 @import "tailwindcss";
 
 /*
- * Rock Cottage palette — warm paper, lake blue, pine, sunset amber.
+ * Rock Cottage — "quiet utility". A white sheet, hairline rules, one deep
+ * evergreen accent, and micro-labels that behave like a well-set schedule.
  * The app commits to one light theme so it looks the same on every phone.
  */
 @theme {
-  --color-paper: #fdf8f0;
+  --color-paper: #ffffff;
   --color-card: #ffffff;
-  --color-ink: #26201a;
-  --color-muted: #7b6f62;
-  --color-line: #e9dfd1;
+  /* Inset panels, pressed states, image placeholders. */
+  --color-subtle: #f4f5f7;
+  --color-ink: #0e1216;
+  --color-ink-soft: #414a54;
+  --color-muted: #767f8a;
+  --color-line: #e6e8ec;
+  --color-line-strong: #d2d6dd;
 
-  --color-pine: #2f5d50;
-  --color-pine-dark: #234639;
-  --color-lake: #2f6f8f;
-  --color-amber: #c9762f;
-  --color-clay: #b4472f;
+  --color-pine: #0f6f57;
+  --color-pine-dark: #0b5844;
+  --color-lake: #15629c;
+  --color-amber: #96631a;
+  --color-clay: #c8322a;
 
-  --font-sans: var(--font-nunito), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-fraunces), Georgia, serif;
+  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-instrument-serif), Georgia, serif;
 }
 
 html {
@@ -31,13 +36,40 @@ body {
   background: var(--color-paper);
   color: var(--color-ink);
   font-family: var(--font-sans);
+  /* Manrope sets wide by default; pulling it in is what reads as "crisp". */
+  letter-spacing: -0.006em;
   overscroll-behavior-y: none;
 }
 
-/* Never let a wide table or long word push the page sideways. */
+/* Never let a wide table or long word push the page sideways. `clip` rather
+   than `hidden`: `hidden` turns these into scroll containers, which quietly
+   kills `position: sticky` for everything inside them. */
 body,
 main {
-  overflow-x: hidden;
+  overflow-x: clip;
+}
+
+/* The serif is display-only — it earns its keep at title sizes, not in UI. */
+.font-display {
+  letter-spacing: -0.012em;
+}
+
+/* One quiet entrance for the page body. No per-item stagger: this is an app
+   people open forty times a day, not a landing page. */
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+main {
+  animation: page-in 0.26s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+:where(a, button, input, textarea, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-pine);
+  outline-offset: 2px;
 }
 
 @utility safe-bottom {
@@ -49,6 +81,15 @@ main {
   min-width: 44px;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+}
+
+/* The recurring micro-label: meal types, field names, section eyebrows. */
+@utility label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
 }
 
 /* Respect users who ask for less motion. */

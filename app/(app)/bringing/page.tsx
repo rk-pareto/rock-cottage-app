@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { requireMember } from "@/lib/auth/membership";
+import { PageHeader } from "@/components/ui/Card";
 import { getBringingItems } from "@/lib/bringing";
 import { BringingClient } from "./BringingClient";
 
@@ -11,10 +12,10 @@ export default async function BringingPage() {
 
   return (
     <>
-      <h1 className="mb-1 font-display text-3xl font-semibold text-ink">We&apos;re Bringing</h1>
-      <p className="mb-6 text-sm text-muted">
-        Claim it here so we don&apos;t end up with four bottles of mustard.
-      </p>
+      <PageHeader
+        title="We&rsquo;re Bringing"
+        subtitle="Claim it here so we don&rsquo;t end up with four bottles of mustard."
+      />
       <BringingClient
         rows={rows.map((r) => ({
           id: r.id,

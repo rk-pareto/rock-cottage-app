@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { requireMember } from "@/lib/auth/membership";
+import { PageHeader } from "@/components/ui/Card";
 import { getOpenShoppingItems, getPickedUpShoppingItems } from "@/lib/shopping";
 import { ShoppingClient, type Row } from "./ShoppingClient";
 
@@ -24,10 +25,10 @@ export default async function ShoppingPage() {
 
   return (
     <>
-      <h1 className="mb-1 font-display text-3xl font-semibold text-ink">Shopping</h1>
-      <p className="mb-6 text-sm text-muted">
-        Whoever&apos;s next into town grabs what&apos;s on the list.
-      </p>
+      <PageHeader
+        title="Shopping"
+        subtitle="Whoever&rsquo;s next into town grabs what&rsquo;s on the list."
+      />
       <ShoppingClient
         open={open.map(toRow)}
         pickedUp={pickedUp.map(toRow)}

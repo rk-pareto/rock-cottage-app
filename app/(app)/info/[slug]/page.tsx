@@ -26,10 +26,13 @@ export default async function InfoPage({ params }: PageProps<"/info/[slug]">) {
 
   return (
     <>
-      <Link href="/info" className="mb-4 inline-block text-sm font-semibold text-lake">
-        ‹ Cottage Info
+      <Link
+        href="/info"
+        className="mb-5 inline-flex items-center gap-1.5 text-xs font-bold text-muted transition-colors hover:text-ink"
+      >
+        <span aria-hidden="true">←</span> Cottage Info
       </Link>
-      <article className="rounded-3xl border border-line bg-card p-5">
+      <article className="border-t border-line pt-6">
         <Markdown>{page.body}</Markdown>
       </article>
     </>

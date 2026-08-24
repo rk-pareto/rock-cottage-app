@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { SignOutButton } from "@/components/SignOutButton";
+import { PageHeader } from "@/components/ui/Card";
 import { requireMember } from "@/lib/auth/membership";
 import { features } from "@/lib/features";
 
@@ -10,30 +11,33 @@ export default async function AccountPage() {
 
   return (
     <>
-      <h1 className="mb-6 font-display text-3xl font-semibold text-ink">Account</h1>
+      <PageHeader title="Account" />
 
-      <dl className="mb-6 flex flex-col gap-3 rounded-3xl border border-line bg-card p-4">
-        <div>
-          <dt className="text-xs font-bold uppercase tracking-wide text-muted">Name</dt>
-          <dd className="text-base font-bold text-ink">{member.displayName}</dd>
-        </div>
-        <div>
-          <dt className="text-xs font-bold uppercase tracking-wide text-muted">Email</dt>
-          <dd className="break-all text-base text-ink">{member.email}</dd>
-        </div>
-        {member.isAdmin ? (
-          <div>
-            <dt className="text-xs font-bold uppercase tracking-wide text-muted">Role</dt>
-            <dd className="text-base text-ink">Admin</dd>
-          </div>
-        ) : null}
+      {/* Label left, value right — the same ledger rhythm as the dog status. */}
+      <dl className="mb-8 flex flex-col">
+        <Field label="Name">
+          <span className="font-bold">{member.displayName}</span>
+        </Field>
+        <Field label="Email">
+          <span className="break-all">{member.email}</span>
+        </Field>
+        {member.isAdmin ? <Field label="Role">Admin</Field> : null}
       </dl>
 
       <SignOutButton className="w-full" />
 
-      <p className="mt-6 text-center text-xs text-muted">
+      <p className="mt-8 text-center text-xs text-muted">
         Rock Cottage · {features.junoEnabled ? "Alice & Juno" : "Alice"}
       </p>
     </>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-b border-line py-3.5">
+      <dt className="label shrink-0 text-muted">{label}</dt>
+      <dd className="min-w-0 text-[0.9375rem] text-ink">{children}</dd>
+    </div>
   );
 }

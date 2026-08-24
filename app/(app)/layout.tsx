@@ -32,13 +32,11 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
  */
 function Unauthorized({ email }: { email: string | null }) {
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center gap-6 px-6 py-12 text-center">
-      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-clay text-3xl">
-        🚧
-      </div>
+    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center gap-7 px-6 py-12">
       <div>
-        <h1 className="font-display text-2xl font-semibold text-ink">Not on the list</h1>
-        <p className="mt-2 text-sm text-muted">
+        <p className="label text-clay">Access</p>
+        <h1 className="mt-2 font-display text-[2rem] leading-tight text-ink">Not on the list</h1>
+        <p className="mt-3 text-sm leading-relaxed text-muted">
           {email ? (
             <>
               <span className="font-semibold text-ink">{email}</span> isn&apos;t one of the

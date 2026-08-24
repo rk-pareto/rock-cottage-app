@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import { RelativeTime } from "@/components/ui/RelativeTime";
+import { EmptyWell } from "@/components/ui/Card";
 import { relativeTime } from "@/lib/time";
 import { addShoppingItem, deleteShoppingItem, setPickedUp } from "./actions";
 
@@ -103,39 +104,37 @@ export function ShoppingClient({
           placeholder="Milk, ice, bug spray…"
           maxLength={200}
           enterKeyHint="done"
-          className="tap min-w-0 flex-1 rounded-2xl border border-line bg-card px-4 py-3 text-base text-ink outline-none focus:border-pine"
+          className="tap min-w-0 flex-1 rounded-xl border border-line bg-card px-4 py-3 text-base text-ink outline-none transition-colors placeholder:text-muted focus:border-ink"
         />
         <button
           type="submit"
           disabled={adding || name.trim().length === 0}
-          className="tap shrink-0 rounded-2xl bg-pine px-5 text-base font-bold text-white active:bg-pine-dark disabled:opacity-50"
+          className="tap shrink-0 rounded-xl bg-ink px-5 text-[0.9375rem] font-extrabold tracking-tight text-paper transition active:scale-[0.98] disabled:opacity-30"
         >
           Add
         </button>
       </form>
 
       {open.length === 0 && pending.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-line px-4 py-8 text-center text-sm text-muted">
-          Nothing needed from town. Enjoy it while it lasts.
-        </p>
+        <EmptyWell>Nothing needed from town. Enjoy it while it lasts.</EmptyWell>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <ul className="overflow-hidden rounded-2xl border border-line">
           {open.map((row) => (
-            <li key={row.id} className="rounded-2xl border border-line bg-card">
+            <li key={row.id} className="border-b border-line bg-card last:border-b-0">
               <div className="flex items-center gap-3 p-3">
                 <button
                   type="button"
                   aria-label={`Mark ${row.name} picked up`}
                   disabled={busyId === row.id}
                   onClick={() => togglePicked(row, true)}
-                  className="tap flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border-2 border-line text-transparent active:bg-paper disabled:opacity-50"
+                  className="tap flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-line-strong text-transparent transition-colors active:bg-subtle disabled:opacity-50"
                 >
-                  ✓
+                  <Check />
                 </button>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-bold text-ink">{row.name}</p>
+                  <p className="truncate text-[0.9375rem] font-bold text-ink">{row.name}</p>
                   <p className="text-xs text-muted">
-                    Added by {row.requestedBy} ·{" "}
+                    {row.requestedBy} ·{" "}
                     <RelativeTime
                       iso={row.createdAt}
                       initial={relativeTime(new Date(row.createdAt))}
@@ -147,27 +146,27 @@ export function ShoppingClient({
                     type="button"
                     disabled={busyId === row.id}
                     onClick={() => setConfirmingId(row.id)}
-                    className="tap shrink-0 rounded-lg px-2 text-sm font-bold text-clay disabled:opacity-50"
+                    className="tap shrink-0 rounded-lg px-2 text-xs font-bold text-muted transition-colors hover:text-clay disabled:opacity-50"
                   >
                     Delete
                   </button>
                 ) : null}
               </div>
               {confirmingId === row.id ? (
-                <div className="flex flex-wrap items-center gap-2 border-t border-line bg-paper p-2">
-                  <span className="flex-1 text-sm text-ink">Delete “{row.name}”?</span>
+                <div className="flex flex-wrap items-center gap-2 border-t border-line bg-subtle p-2.5">
+                  <span className="flex-1 text-sm text-ink">Delete &ldquo;{row.name}&rdquo;?</span>
                   <button
                     type="button"
                     onClick={() => remove(row)}
                     disabled={busyId === row.id}
-                    className="tap rounded-xl bg-clay px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+                    className="tap rounded-lg bg-clay px-4 py-2 text-xs font-extrabold text-white disabled:opacity-50"
                   >
                     Delete
                   </button>
                   <button
                     type="button"
                     onClick={() => setConfirmingId(null)}
-                    className="tap rounded-xl px-3 py-2 text-sm font-bold text-muted"
+                    className="tap rounded-lg px-3 py-2 text-xs font-extrabold text-ink-soft"
                   >
                     Keep
                   </button>
@@ -176,10 +175,10 @@ export function ShoppingClient({
             </li>
           ))}
           {pending.map((n) => (
-            <li key={`pending-${n}`} className="rounded-2xl border border-line bg-card opacity-60">
+            <li key={`pending-${n}`} className="border-b border-line bg-card opacity-50 last:border-b-0">
               <div className="flex items-center gap-3 p-3">
-                <div className="h-11 w-11 shrink-0 rounded-xl border-2 border-line" />
-                <p className="truncate font-bold text-ink">{n}</p>
+                <div className="h-11 w-11 shrink-0 rounded-full border border-line-strong" />
+                <p className="truncate text-[0.9375rem] font-bold text-ink">{n}</p>
               </div>
             </li>
           ))}
@@ -191,29 +190,34 @@ export function ShoppingClient({
           <button
             type="button"
             onClick={() => setShowPickedUp((v) => !v)}
-            className="tap flex w-full items-center justify-between rounded-2xl px-1 py-2 text-sm font-bold text-muted"
+            className="tap flex w-full items-center gap-3 py-2 text-left"
           >
-            <span>Picked up · {pickedUp.length}</span>
-            <span aria-hidden="true">{showPickedUp ? "▾" : "▸"}</span>
+            <span className="label shrink-0 text-muted">Picked up · {pickedUp.length}</span>
+            <span aria-hidden="true" className="h-px flex-1 bg-line" />
+            <span aria-hidden="true" className="shrink-0 text-xs text-muted">
+              {showPickedUp ? "Hide" : "Show"}
+            </span>
           </button>
           {showPickedUp ? (
-            <ul className="mt-2 flex flex-col gap-2">
+            <ul className="mt-2 overflow-hidden rounded-2xl border border-line">
               {pickedUp.map((row) => (
                 <li
                   key={row.id}
-                  className="flex items-center gap-3 rounded-2xl border border-line bg-card/60 p-3"
+                  className="flex items-center gap-3 border-b border-line bg-card p-3 last:border-b-0"
                 >
                   <button
                     type="button"
                     aria-label={`Undo pickup of ${row.name}`}
                     disabled={busyId === row.id}
                     onClick={() => togglePicked(row, false)}
-                    className="tap flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-pine text-lg font-bold text-white disabled:opacity-50"
+                    className="tap flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-pine text-white disabled:opacity-50"
                   >
-                    ✓
+                    <Check />
                   </button>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-bold text-muted line-through">{row.name}</p>
+                    <p className="truncate text-[0.9375rem] font-bold text-muted line-through">
+                      {row.name}
+                    </p>
                     <p className="text-xs text-muted">
                       Picked up by {row.pickedUpBy ?? "someone"}
                     </p>
@@ -223,7 +227,7 @@ export function ShoppingClient({
                       type="button"
                       disabled={busyId === row.id}
                       onClick={() => remove(row)}
-                      className="tap shrink-0 rounded-lg px-2 text-sm font-bold text-clay disabled:opacity-50"
+                      className="tap shrink-0 rounded-lg px-2 text-xs font-bold text-muted transition-colors hover:text-clay disabled:opacity-50"
                     >
                       Delete
                     </button>
@@ -235,5 +239,23 @@ export function ShoppingClient({
         </div>
       ) : null}
     </>
+  );
+}
+
+/** A drawn tick, so the checkbox doesn't depend on a text glyph's metrics. */
+function Check() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2.4}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="m5 12.5 4.5 4.5L19 7" />
+    </svg>
   );
 }
