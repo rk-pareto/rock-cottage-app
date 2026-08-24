@@ -3,8 +3,8 @@
 import { useCallback, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
-import { deleteMemory } from "./actions";
-import { PlayGlyph } from "@/components/ui/icons";
+import { deleteMemory, toggleFavorite } from "./actions";
+import { HeartGlyph, PlayGlyph } from "@/components/ui/icons";
 
 export type MemoryCardData = {
   id: string;
@@ -18,6 +18,9 @@ export type MemoryCardData = {
   /** False for clips too large to hand to the OS share sheet in one piece. */
   shareable: boolean;
   createdAt: string;
+  /** Whether the *current* member has favorited this memory — never other
+   *  members' favorites, which stay private to them. */
+  favorited: boolean;
 };
 
 type UploadState = {
@@ -52,6 +55,10 @@ export function MemoriesClient({
   const [lightboxId, setLightboxId] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [isSharing, setIsSharing] = useState(false);
+  const [tab, setTab] = useState<"all" | "favorites">("all");
+  // Optimistic per-memory overrides, keyed by id. Falls back to the server's
+  // `favorited` once a memory has no override — never guessed at.
+  const [favoriteOverrides, setFavoriteOverrides] = useState<Record<string, boolean>>({});
   const sharePrefetch = useRef<{ id: string; file: Promise<File> } | null>(null);
   // False during SSR, so the button appears only once hydration has asked the
   // browser — no markup mismatch.
@@ -212,6 +219,21 @@ export function MemoriesClient({
     }
   }
 
+  const isFavorited = useCallback(
+    (memory: MemoryCardData) => favoriteOverrides[memory.id] ?? memory.favorited,
+    [favoriteOverrides],
+  );
+
+  async function toggleFav(memory: MemoryCardData) {
+    const next = !isFavorited(memory);
+    setFavoriteOverrides((current) => ({ ...current, [memory.id]: next }));
+    const result = await toggleFavorite(memory.id);
+    if (!result.ok) {
+      setFavoriteOverrides((current) => ({ ...current, [memory.id]: !next }));
+      toast(result.error, "error");
+    }
+  }
+
   function remove(memory: MemoryCardData) {
     startTransition(async () => {
       const result = await deleteMemory(memory.id);
@@ -230,6 +252,7 @@ export function MemoriesClient({
   const lightboxMemory = memories.find((m) => m.id === lightboxId) ?? null;
   const canDelete = (memory: MemoryCardData) =>
     memory.uploadedByMemberId === currentMemberId || isAdmin;
+  const visibleMemories = tab === "favorites" ? memories.filter(isFavorited) : memories;
 
   return (
     <>
@@ -288,43 +311,73 @@ export function MemoriesClient({
         </ul>
       ) : null}
 
-      {memories.length === 0 ? (
+      {memories.length > 0 ? (
+        <div className="mb-4 inline-flex rounded-full border border-line bg-subtle p-1">
+          {(["all", "favorites"] as const).map((value) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setTab(value)}
+              className={`label rounded-full px-3.5 py-1.5 transition-colors ${
+                tab === value ? "bg-ink text-paper" : "text-muted"
+              }`}
+            >
+              {value === "all" ? "All" : "Favorites"}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {visibleMemories.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-line-strong px-6 py-14 text-center text-sm text-muted">
-          Nothing here yet. Someone go take a picture of the lake.
+          {tab === "favorites"
+            ? "No favorites yet. Tap the heart on a photo or video to save it here."
+            : "Nothing here yet. Someone go take a picture of the lake."}
         </p>
       ) : (
         <ul className="grid grid-cols-3 gap-1">
-          {memories.map((memory) => (
-            <li key={memory.id} className="aspect-square">
+          {visibleMemories.map((memory) => (
+            <li key={memory.id} className="relative aspect-square">
               {/* A clip whose poster never made it is still openable once its
                   bytes have landed — it just has no still to show. */}
               {memory.thumbnailUrl ||
               (memory.kind === "video" && memory.processingStatus === "ready") ? (
-                <button
-                  type="button"
-                  onClick={() => openLightbox(memory)}
-                  className="group relative h-full w-full overflow-hidden rounded-lg bg-subtle"
-                >
-                  {memory.thumbnailUrl ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img
-                      src={memory.thumbnailUrl}
-                      alt={`Added by ${memory.uploadedBy}`}
-                      loading="lazy"
-                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
-                    />
-                  ) : (
-                    <span className="flex h-full w-full items-center justify-center text-line-strong">
-                      <PlayGlyph className="h-7 w-7" />
-                    </span>
-                  )}
-                  {memory.kind === "video" ? (
-                    <span className="absolute bottom-1 left-1 flex items-center gap-1 rounded-md bg-ink/70 px-1.5 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">
-                      <PlayGlyph className="h-2.5 w-2.5" />
-                      {memory.durationLabel ?? "Video"}
-                    </span>
-                  ) : null}
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => openLightbox(memory)}
+                    className="group relative h-full w-full overflow-hidden rounded-lg bg-subtle"
+                  >
+                    {memory.thumbnailUrl ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={memory.thumbnailUrl}
+                        alt={`Added by ${memory.uploadedBy}`}
+                        loading="lazy"
+                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+                      />
+                    ) : (
+                      <span className="flex h-full w-full items-center justify-center text-line-strong">
+                        <PlayGlyph className="h-7 w-7" />
+                      </span>
+                    )}
+                    {memory.kind === "video" ? (
+                      <span className="absolute bottom-1 left-1 flex items-center gap-1 rounded-md bg-ink/70 px-1.5 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">
+                        <PlayGlyph className="h-2.5 w-2.5" />
+                        {memory.durationLabel ?? "Video"}
+                      </span>
+                    ) : null}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => toggleFav(memory)}
+                    aria-label={isFavorited(memory) ? "Remove from favorites" : "Add to favorites"}
+                    aria-pressed={isFavorited(memory)}
+                    className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-ink/50 text-white backdrop-blur-sm transition-transform active:scale-90"
+                  >
+                    <HeartGlyph filled={isFavorited(memory)} className="h-3.5 w-3.5" />
+                  </button>
+                </>
               ) : (
                 <div className="flex h-full w-full flex-col items-center justify-center rounded-lg border border-dashed border-line-strong p-1 text-center">
                   <span className="text-[10px] font-bold text-muted">
@@ -356,13 +409,26 @@ export function MemoriesClient({
             <span className="label min-w-0 truncate text-white/60">
               {lightboxMemory.uploadedBy}
             </span>
-            <button
-              type="button"
-              onClick={() => setLightboxId(null)}
-              className="tap rounded-lg px-3 py-2 text-xs font-extrabold text-white/80 transition-colors hover:text-white"
-            >
-              Close
-            </button>
+            <div className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                onClick={() => toggleFav(lightboxMemory)}
+                aria-label={
+                  isFavorited(lightboxMemory) ? "Remove from favorites" : "Add to favorites"
+                }
+                aria-pressed={isFavorited(lightboxMemory)}
+                className="tap rounded-lg p-2 text-white/80 transition-colors hover:text-white"
+              >
+                <HeartGlyph filled={isFavorited(lightboxMemory)} className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setLightboxId(null)}
+                className="tap rounded-lg px-3 py-2 text-xs font-extrabold text-white/80 transition-colors hover:text-white"
+              >
+                Close
+              </button>
+            </div>
           </div>
 
           <div className="flex flex-1 items-center justify-center overflow-hidden p-2">

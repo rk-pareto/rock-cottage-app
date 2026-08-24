@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
 import { requireMember } from "@/lib/auth/membership";
 import { PageHeader } from "@/components/ui/Card";
-import { formatDuration, getMemories, withThumbnailUrls } from "@/lib/memories";
+import {
+  formatDuration,
+  getFavoriteMemoryIds,
+  getMemories,
+  withThumbnailUrls,
+} from "@/lib/memories";
 import { isStorageConfigured } from "@/lib/storage/s3";
 import { MAX_SHAREABLE_VIDEO_BYTES } from "@/lib/validation/schemas";
 import { MemoriesClient } from "./MemoriesClient";
@@ -11,7 +16,11 @@ export const metadata: Metadata = { title: "Memories · Rock Cottage" };
 export default async function MemoriesPage() {
   const member = await requireMember();
   const storageReady = isStorageConfigured();
-  const rows = storageReady ? await withThumbnailUrls(await getMemories()) : [];
+  const [memories, favoriteIds] = await Promise.all([
+    storageReady ? getMemories() : Promise.resolve([]),
+    getFavoriteMemoryIds(member.id),
+  ]);
+  const rows = storageReady ? await withThumbnailUrls(memories) : [];
 
   return (
     <>
@@ -28,6 +37,7 @@ export default async function MemoriesPage() {
           durationLabel: formatDuration(r.durationSeconds),
           shareable: r.kind === "image" || r.originalBytes <= MAX_SHAREABLE_VIDEO_BYTES,
           createdAt: r.createdAt.toISOString(),
+          favorited: favoriteIds.has(r.id),
         }))}
         currentMemberId={member.id}
         isAdmin={member.isAdmin}

@@ -1,7 +1,7 @@
 import "server-only";
 import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { media, members, type MediaKind } from "@/db/schema";
+import { media, members, memoryFavorites, type MediaKind } from "@/db/schema";
 import { presignView } from "@/lib/storage/s3";
 
 export type MemoryRow = {
@@ -70,6 +70,19 @@ export async function withThumbnailUrls(rows: MemoryRow[]): Promise<MemoryCard[]
       thumbnailUrl: row.thumbnailKey ? await presignView(row.thumbnailKey).catch(() => null) : null,
     })),
   );
+}
+
+/**
+ * A member's own favorited memory ids. Scoped to one member_id only — there
+ * is no query anywhere that lists favorites across members (spec: favorites
+ * stay private).
+ */
+export async function getFavoriteMemoryIds(memberId: string): Promise<Set<string>> {
+  const rows = await db
+    .select({ memoryId: memoryFavorites.memoryId })
+    .from(memoryFavorites)
+    .where(eq(memoryFavorites.memberId, memberId));
+  return new Set(rows.map((r) => r.memoryId));
 }
 
 export async function getMemoryById(id: string) {

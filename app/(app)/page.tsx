@@ -164,8 +164,22 @@ function UpcomingMealCard({ meal, today }: { meal: MealRow; today: string }) {
   const day = isToday ? "Today" : formatLongDate(meal.mealDate).split(",")[0];
 
   return (
-    <Card className="transition-colors active:bg-subtle">
-      <Link href="/meals" className="block">
+    <Link
+      href="/meals"
+      className="block overflow-hidden rounded-2xl border border-line bg-card shadow-[0_1px_1px_rgba(14,18,22,0.03)] transition-colors active:bg-subtle"
+    >
+      {meal.photoPath ? (
+        <div className="aspect-[16/9] w-full overflow-hidden bg-subtle">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={`/${meal.photoPath}`}
+            alt={meal.title}
+            loading="lazy"
+            className="h-full w-full object-cover"
+          />
+        </div>
+      ) : null}
+      <div className="p-4">
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span className={`label ${isToday ? "text-ink" : "text-muted"}`}>{day}</span>
           <span aria-hidden="true" className="h-3 w-px bg-line-strong" />
@@ -185,8 +199,8 @@ function UpcomingMealCard({ meal, today }: { meal: MealRow; today: string }) {
             {meal.responsible.length > 0 ? meal.responsible.join(" & ") : "Everyone"}
           </span>
         </p>
-      </Link>
-    </Card>
+      </div>
+    </Link>
   );
 }
 

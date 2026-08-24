@@ -11,6 +11,7 @@ export type MealRow = {
   title: string;
   displayDescription: string | null;
   practicalNotes: string | null;
+  photoPath: string | null;
   responsible: string[];
 };
 
@@ -39,6 +40,7 @@ async function withAssignments(rows: (typeof meals.$inferSelect)[]): Promise<Mea
     title: row.title,
     displayDescription: row.displayDescription,
     practicalNotes: row.practicalNotes,
+    photoPath: row.photoPath,
     responsible: (byMeal.get(row.id) ?? []).sort(),
   }));
 }

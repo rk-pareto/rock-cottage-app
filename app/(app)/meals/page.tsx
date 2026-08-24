@@ -62,23 +62,31 @@ export default async function MealsPage() {
 
 function MealCard({ meal }: { meal: MealRow }) {
   return (
-    <article className="rounded-2xl border border-line bg-card p-4">
-      <p className="label text-muted">{TYPE_LABEL[meal.mealType] ?? meal.mealType}</p>
-      <h3 className="mt-2 font-display text-[1.5rem] leading-tight text-ink">{meal.title}</h3>
-      {meal.displayDescription ? (
-        <p className="mt-2 text-sm leading-relaxed text-muted">{meal.displayDescription}</p>
+    <article className="overflow-hidden rounded-2xl border border-line bg-card">
+      {meal.photoPath ? (
+        <div className="aspect-[16/9] w-full overflow-hidden bg-subtle">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={`/${meal.photoPath}`}
+            alt={meal.title}
+            loading="lazy"
+            className="h-full w-full object-cover"
+          />
+        </div>
       ) : null}
-      <p className="mt-3 border-t border-line pt-2.5 text-sm">
-        <span className="text-muted">Cooking</span>{" "}
-        <span className="font-bold text-ink">
-          {meal.responsible.length > 0 ? meal.responsible.join(" & ") : "Everyone"}
-        </span>
-      </p>
-      {meal.practicalNotes ? (
-        <p className="mt-3 rounded-xl bg-subtle px-3 py-2.5 text-xs leading-relaxed text-ink-soft">
-          {meal.practicalNotes}
+      <div className="p-4">
+        <p className="label text-muted">{TYPE_LABEL[meal.mealType] ?? meal.mealType}</p>
+        <h3 className="mt-2 font-display text-[1.5rem] leading-tight text-ink">{meal.title}</h3>
+        {meal.displayDescription ? (
+          <p className="mt-2 text-sm leading-relaxed text-muted">{meal.displayDescription}</p>
+        ) : null}
+        <p className="mt-3 border-t border-line pt-2.5 text-sm">
+          <span className="text-muted">Cooking</span>{" "}
+          <span className="font-bold text-ink">
+            {meal.responsible.length > 0 ? meal.responsible.join(" & ") : "Everyone"}
+          </span>
         </p>
-      ) : null}
+      </div>
     </article>
   );
 }

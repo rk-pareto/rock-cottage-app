@@ -1,9 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { media } from "@/db/schema";
+import { media, memoryFavorites } from "@/db/schema";
 import { requireMember } from "@/lib/auth/membership";
 import { deleteObjects } from "@/lib/storage/s3";
 import { uuidSchema } from "@/lib/validation/schemas";
@@ -53,3 +53,47 @@ export async function deleteMemory(memoryId: string): Promise<ActionResult> {
   revalidatePath("/");
   return { ok: true };
 }
+
+export type FavoriteResult = ActionResult & { favorited?: boolean };
+
+/**
+ * Toggle whether the current member has favorited a memory. Scoped entirely
+ * to `member.id` — no one else's favorites are ever read or written here
+ * (spec: favorites are private to each member).
+ */
+export async function toggleFavorite(memoryId: string): Promise<FavoriteResult> {
+  let member;
+  try {
+    member = await requireMember();
+  } catch {
+    return { ok: false, error: "You're signed out. Sign in and try again." };
+  }
+
+  const parsed = uuidSchema.safeParse(memoryId);
+  if (!parsed.success) return { ok: false, error: "That memory isn't valid." };
+
+  const match = and(
+    eq(memoryFavorites.memberId, member.id),
+    eq(memoryFavorites.memoryId, parsed.data),
+  );
+
+  try {
+    const [existing] = await db.select().from(memoryFavorites).where(match).limit(1);
+    if (existing) {
+      await db.delete(memoryFavorites).where(match);
+      revalidatePath("/memories");
+      return { ok: true, favorited: false };
+    }
+
+    await db
+      .insert(memoryFavorites)
+      .values({ memberId: member.id, memoryId: parsed.data })
+      .onConflictDoNothing();
+    revalidatePath("/memories");
+    return { ok: true, favorited: true };
+  } catch (error) {
+    console.error("toggleFavorite failed", error);
+    return { ok: false, error: "Couldn't update your favorites. Try again." };
+  }
+}
+

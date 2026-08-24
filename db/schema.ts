@@ -64,6 +64,8 @@ export const meals = pgTable(
     title: varchar("title", { length: 200 }).notNull(),
     displayDescription: text("display_description"),
     practicalNotes: text("practical_notes"),
+    /** Relative path under public/, e.g. "meals/chili.jpg" (spec: meal photos). */
+    photoPath: text("photo_path"),
     sortOrder: integer("sort_order").notNull().default(0),
     createdAt,
     updatedAt,
@@ -200,6 +202,28 @@ export const media = pgTable(
   ],
 );
 
+/**
+ * A member's private favorites among the memories. Never joined against other
+ * members — every query is scoped to one member_id, so who favorited what
+ * stays visible only to that member.
+ */
+export const memoryFavorites = pgTable(
+  "memory_favorites",
+  {
+    memberId: uuid("member_id")
+      .notNull()
+      .references(() => members.id, { onDelete: "cascade" }),
+    memoryId: uuid("memory_id")
+      .notNull()
+      .references(() => media.id, { onDelete: "cascade" }),
+    createdAt,
+  },
+  (t) => [
+    primaryKey({ columns: [t.memberId, t.memoryId] }),
+    index("memory_favorites_member_idx").on(t.memberId, t.createdAt.desc()),
+  ],
+);
+
 export type Member = typeof members.$inferSelect;
 export type Meal = typeof meals.$inferSelect;
 export type Pet = typeof pets.$inferSelect;
@@ -207,3 +231,5 @@ export type PetEvent = typeof petEvents.$inferSelect;
 export type ShoppingItem = typeof shoppingItems.$inferSelect;
 export type BringingItem = typeof bringingItems.$inferSelect;
 export type Media = typeof media.$inferSelect;
+export type MemoryFavorite = typeof memoryFavorites.$inferSelect;
+
