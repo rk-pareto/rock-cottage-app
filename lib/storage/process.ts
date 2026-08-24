@@ -1,5 +1,5 @@
 import "server-only";
-import sharp from "sharp";
+import sharp, { type Sharp } from "sharp";
 
 export type Derivative = { buffer: Buffer; contentType: string };
 export type ProcessedImage = {
@@ -36,48 +36,104 @@ async function withConcurrencyLimit<T>(task: () => Promise<T>): Promise<T> {
   }
 }
 
+/** Resize + encode both variants from a fresh pipeline per output. */
+async function renderVariants(
+  makePipeline: () => Sharp,
+  knownSize?: { width: number; height: number },
+): Promise<ProcessedImage> {
+  let width = knownSize?.width ?? null;
+  let height = knownSize?.height ?? null;
+
+  if (!knownSize) {
+    const metadata = await makePipeline().metadata();
+    // After auto-orientation width/height may swap.
+    const oriented = metadata.autoOrient ?? { width: metadata.width, height: metadata.height };
+    width = oriented.width ?? metadata.width ?? null;
+    height = oriented.height ?? metadata.height ?? null;
+  }
+
+  const [display, thumbnail] = await Promise.all([
+    makePipeline()
+      .resize({
+        width: DISPLAY_MAX_EDGE,
+        height: DISPLAY_MAX_EDGE,
+        fit: "inside",
+        withoutEnlargement: true,
+      })
+      .webp({ quality: DISPLAY_QUALITY })
+      .toBuffer(),
+    makePipeline()
+      .resize({
+        width: THUMBNAIL_MAX_EDGE,
+        height: THUMBNAIL_MAX_EDGE,
+        fit: "inside",
+        withoutEnlargement: true,
+      })
+      .webp({ quality: THUMBNAIL_QUALITY })
+      .toBuffer(),
+  ]);
+
+  return {
+    display: { buffer: display, contentType: "image/webp" },
+    thumbnail: { buffer: thumbnail, contentType: "image/webp" },
+    width,
+    height,
+  };
+}
+
+/** Cheap container sniff: ISO-BMFF `ftyp` box with a HEIF-family brand. */
+function looksLikeHeif(buffer: Buffer): boolean {
+  if (buffer.length < 12) return false;
+  if (buffer.toString("latin1", 4, 8) !== "ftyp") return false;
+  const brand = buffer.toString("latin1", 8, 12);
+  return ["heic", "heix", "hevc", "hevx", "heim", "heis", "hevm", "hevs", "mif1", "msf1"].includes(
+    brand,
+  );
+}
+
+/**
+ * sharp's prebuilt libvips reads the HEIF *container* but has no HEVC codec,
+ * so `metadata()` succeeds while decoding fails with "bad seek". iPhones
+ * default to HEIC, so decode those through libheif (WASM) and hand sharp raw
+ * pixels instead (spec §14.6).
+ */
+async function decodeHeif(
+  original: Buffer,
+): Promise<{ data: Buffer; width: number; height: number } | null> {
+  if (!looksLikeHeif(original)) return null;
+  try {
+    const { default: decode } = await import("heic-decode");
+    const { width, height, data } = await decode({ buffer: original });
+    return { data: Buffer.from(data.buffer, data.byteOffset, data.byteLength), width, height };
+  } catch (error) {
+    console.error("HEIC fallback decode failed", error);
+    return null;
+  }
+}
+
 /**
  * Build the display and thumbnail variants. The original buffer is only ever
  * read — it is never written back (spec §14.2).
  */
 export function processImage(original: Buffer): Promise<ProcessedImage> {
   return withConcurrencyLimit(async () => {
-    // `failOn: "none"` keeps slightly malformed phone images usable rather
-    // than failing the whole upload.
-    const base = () => sharp(original, { failOn: "none" }).rotate();
+    try {
+      // `failOn: "none"` keeps slightly malformed phone images usable rather
+      // than failing the whole upload.
+      return await renderVariants(() => sharp(original, { failOn: "none" }).rotate());
+    } catch (error) {
+      const raw = await decodeHeif(original);
+      if (!raw) throw error;
 
-    const metadata = await base().metadata();
-    // After auto-orientation, width/height may swap.
-    const rotated = metadata.autoOrient ?? { width: metadata.width, height: metadata.height };
-    const width = rotated.width ?? metadata.width ?? null;
-    const height = rotated.height ?? metadata.height ?? null;
-
-    const [display, thumbnail] = await Promise.all([
-      base()
-        .resize({
-          width: DISPLAY_MAX_EDGE,
-          height: DISPLAY_MAX_EDGE,
-          fit: "inside",
-          withoutEnlargement: true,
-        })
-        .webp({ quality: DISPLAY_QUALITY })
-        .toBuffer(),
-      base()
-        .resize({
-          width: THUMBNAIL_MAX_EDGE,
-          height: THUMBNAIL_MAX_EDGE,
-          fit: "inside",
-          withoutEnlargement: true,
-        })
-        .webp({ quality: THUMBNAIL_QUALITY })
-        .toBuffer(),
-    ]);
-
-    return {
-      display: { buffer: display, contentType: "image/webp" },
-      thumbnail: { buffer: thumbnail, contentType: "image/webp" },
-      width,
-      height,
-    };
+      // libheif already applies the image's rotation, and raw pixels carry no
+      // EXIF, so no .rotate() here.
+      return renderVariants(
+        () =>
+          sharp(raw.data, {
+            raw: { width: raw.width, height: raw.height, channels: 4 },
+          }),
+        { width: raw.width, height: raw.height },
+      );
+    }
   });
 }
