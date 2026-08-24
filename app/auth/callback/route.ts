@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import {
   NEON_AUTH_HEADER_MIDDLEWARE_NAME,
   NEON_AUTH_SESSION_COOKIE_NAME,
@@ -39,7 +38,7 @@ export async function GET(request: Request): Promise<Response> {
   if (!verifier) {
     // Already signed in on this device? Then the link was simply redundant.
     if (extractNeonAuthCookies(request.headers).includes(NEON_AUTH_SESSION_COOKIE_NAME)) {
-      return redirectTo(requestUrl, "/", []);
+      return redirectTo("/", []);
     }
     // Otherwise the link expired, was already used, or a mail client opened it
     // first — Neon reports which in `error`.
@@ -47,7 +46,7 @@ export async function GET(request: Request): Promise<Response> {
     console.warn("auth callback without verifier", {
       params: [...requestUrl.searchParams.keys()],
     });
-    return redirectTo(requestUrl, `/auth/sign-in?error=${encodeURIComponent(code)}`, []);
+    return redirectTo(`/auth/sign-in?error=${encodeURIComponent(code)}`, []);
   }
 
   const upstreamUrl = new URL(`${AUTH_BASE_URL.replace(/\/$/, "")}/get-session`);
@@ -60,7 +59,7 @@ export async function GET(request: Request): Promise<Response> {
       redirect: "manual",
       headers: {
         Cookie: extractNeonAuthCookies(request.headers),
-        Origin: requestUrl.origin,
+        Origin: publicOrigin(request, requestUrl),
         [NEON_AUTH_HEADER_MIDDLEWARE_NAME]: "true",
       },
     });
@@ -68,7 +67,7 @@ export async function GET(request: Request): Promise<Response> {
     cookies = handled.headers.getSetCookie();
   } catch (error) {
     console.error("auth callback exchange failed", error);
-    return redirectTo(requestUrl, "/auth/sign-in?error=LINK_FAILED", []);
+    return redirectTo("/auth/sign-in?error=LINK_FAILED", []);
   }
 
   const signedIn = cookies.some((cookie) =>
@@ -76,10 +75,10 @@ export async function GET(request: Request): Promise<Response> {
   );
   if (!signedIn) {
     console.warn("auth callback exchange returned no session cookie");
-    return redirectTo(requestUrl, "/auth/sign-in?error=LINK_INVALID", []);
+    return redirectTo("/auth/sign-in?error=LINK_INVALID", []);
   }
 
-  return redirectTo(requestUrl, safeNext(requestUrl.searchParams.get("next")), cookies);
+  return redirectTo(safeNext(requestUrl.searchParams.get("next")), cookies);
 }
 
 /**
@@ -91,8 +90,24 @@ function safeNext(raw: string | null): string {
   return raw;
 }
 
-function redirectTo(requestUrl: URL, path: string, cookies: string[]): Response {
-  const response = NextResponse.redirect(new URL(path, requestUrl), 303);
-  for (const cookie of cookies) response.headers.append("Set-Cookie", cookie);
-  return response;
+/**
+ * Behind Railway's proxy `request.url` is the container's own address
+ * (`localhost:8080`), which Neon would reject as an untrusted origin.
+ */
+function publicOrigin(request: Request, requestUrl: URL): string {
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  if (!host) return requestUrl.origin;
+  const protocol = request.headers.get("x-forwarded-proto") ?? requestUrl.protocol.replace(":", "");
+  return `${protocol}://${host}`;
+}
+
+/**
+ * A relative `Location` for the same reason: the browser resolves it against
+ * the address it actually asked for, so no proxy header can send it to a host
+ * that only exists inside the container.
+ */
+function redirectTo(path: string, cookies: string[]): Response {
+  const headers = new Headers({ Location: path });
+  for (const cookie of cookies) headers.append("Set-Cookie", cookie);
+  return new Response(null, { status: 303, headers });
 }
