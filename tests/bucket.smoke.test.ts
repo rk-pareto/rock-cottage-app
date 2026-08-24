@@ -13,13 +13,13 @@ import { processImage } from "@/lib/storage/process";
 /**
  * Exercises the real Railway bucket, so it is opt-in:
  *   RUN_BUCKET_SMOKE=1 npx vitest run tests/bucket.smoke.test.ts
- * It writes only under `photos/_smoketest-*` and deletes what it creates.
+ * It writes only under `memories/_smoketest-*` and deletes what it creates.
  */
 const enabled = process.env.RUN_BUCKET_SMOKE === "1" && isStorageConfigured();
 
 describe.skipIf(!enabled)("Railway bucket round-trip", () => {
   it("uploads, reads back, derives, downloads, and stays private", async () => {
-    const prefix = `photos/_smoketest-${Date.now()}`;
+    const prefix = `memories/_smoketest-${Date.now()}`;
     const originalKey = `${prefix}/original/iphone-sample.heic`;
     const displayKey = `${prefix}/display.webp`;
     const heic = await readFile("tests/fixtures/iphone-sample.heic");

@@ -4,9 +4,14 @@ import { Card, EmptyState, SectionLabel } from "@/components/ui/Card";
 import { RelativeTime } from "@/components/ui/RelativeTime";
 import { requireMember } from "@/lib/auth/membership";
 import { getDogStatuses } from "@/lib/dogs";
-import { interleaveFeed, photoDrawCount, photoDrawSeed, pickSeeded } from "@/lib/feed";
+import { interleaveFeed, memoryDrawCount, memoryDrawSeed, pickSeeded } from "@/lib/feed";
 import { getUpcomingMeals, type MealRow } from "@/lib/meals";
-import { getReadyPhotos, withThumbnailUrls, type PhotoCard } from "@/lib/photos";
+import {
+  formatDuration,
+  getReadyMemories,
+  withThumbnailUrls,
+  type MemoryCard,
+} from "@/lib/memories";
 import { getOpenShoppingItems } from "@/lib/shopping";
 import { isStorageConfigured } from "@/lib/storage/s3";
 import { cottageToday, formatLongDate, relativeTime } from "@/lib/time";
@@ -28,24 +33,24 @@ const DOG_LABEL: Record<PetEventType, string> = {
 
 /** The draw pool — wide enough that the selection feels random, small enough
  *  to stay one cheap query. */
-const PHOTO_POOL = 60;
+const MEMORY_POOL = 60;
 
 export default async function HomePage() {
   const member = await requireMember();
   const storageReady = isStorageConfigured();
 
   // Home queries the source tables directly — no activity-feed system (spec §43).
-  const [meals, dogs, shopping, photoPool] = await Promise.all([
+  const [meals, dogs, shopping, memoryPool] = await Promise.all([
     getUpcomingMeals(5),
     getDogStatuses(),
     getOpenShoppingItems(),
-    storageReady ? getReadyPhotos(PHOTO_POOL) : Promise.resolve([]),
+    storageReady ? getReadyMemories(MEMORY_POOL) : Promise.resolve([]),
   ]);
 
-  // Only the drawn photos get presigned URLs — no point signing the whole pool.
-  const drawn = pickSeeded(photoPool, photoDrawCount(meals.length), photoDrawSeed());
-  const photos = drawn.length > 0 ? await withThumbnailUrls(drawn) : [];
-  const feed = interleaveFeed(meals, photos);
+  // Only the drawn memories get presigned URLs — no point signing the pool.
+  const drawn = pickSeeded(memoryPool, memoryDrawCount(meals.length), memoryDrawSeed());
+  const memories = drawn.length > 0 ? await withThumbnailUrls(drawn) : [];
+  const feed = interleaveFeed(meals, memories);
   const today = cottageToday();
 
   return (
@@ -69,7 +74,7 @@ export default async function HomePage() {
             item.kind === "meal" ? (
               <UpcomingMealCard key={`meal-${item.meal.id}`} meal={item.meal} today={today} />
             ) : (
-              <PhotoBreak key={`photo-${item.photo.id}`} photo={item.photo} />
+              <MemoryBreak key={`memory-${item.memory.id}`} memory={item.memory} />
             ),
           )
         )}
@@ -135,17 +140,17 @@ export default async function HomePage() {
         )}
       </section>
 
-      {/* Photos are woven into the feed above; this covers the case where
+      {/* Memories are woven into the feed above; this covers the case where
           there were none to weave in. */}
-      {photos.length === 0 ? (
+      {memories.length === 0 ? (
         <section className="flex flex-col gap-3">
-          <SectionLabel href="/photos" action="View all">
-            Photos
+          <SectionLabel href="/memories" action="View all">
+            Memories
           </SectionLabel>
           <EmptyState>
             {storageReady
-              ? "No photos yet. Someone go take a picture of the lake."
-              : "Photo storage isn't set up yet."}
+              ? "Nothing here yet. Someone go take a picture of the lake."
+              : "Memory storage isn't set up yet."}
           </EmptyState>
         </section>
       ) : null}
@@ -185,34 +190,46 @@ function UpcomingMealCard({ meal, today }: { meal: MealRow; today: string }) {
 }
 
 /**
- * A photo dropped between meals. Deliberately shaped unlike a meal card: the
+ * A memory dropped between meals. Deliberately shaped unlike a meal card: the
  * picture is from earlier in the week and has nothing to do with the meal
- * above it.
+ * above it. Tapping it lands on the gallery, so a clip is marked as a clip
+ * rather than pretending to play here.
  */
-function PhotoBreak({ photo }: { photo: PhotoCard }) {
-  const portrait = photo.width && photo.height ? photo.height > photo.width : false;
+function MemoryBreak({ memory }: { memory: MemoryCard }) {
+  const portrait = memory.width && memory.height ? memory.height > memory.width : false;
+  const duration = formatDuration(memory.durationSeconds);
 
   return (
-    <Link href="/photos" className="group block overflow-hidden rounded-2xl">
-      <div className={`w-full overflow-hidden rounded-2xl bg-subtle ${portrait ? "aspect-[4/5]" : "aspect-[4/3]"}`}>
-        {photo.thumbnailUrl ? (
+    <Link href="/memories" className="group block overflow-hidden rounded-2xl">
+      <div
+        className={`relative w-full overflow-hidden rounded-2xl bg-subtle ${portrait ? "aspect-[4/5]" : "aspect-[4/3]"}`}
+      >
+        {memory.thumbnailUrl ? (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
-            src={photo.thumbnailUrl}
-            alt={`Uploaded by ${photo.uploadedBy}`}
+            src={memory.thumbnailUrl}
+            alt={`Added by ${memory.uploadedBy}`}
             loading="lazy"
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
           />
+        ) : null}
+        {memory.kind === "video" ? (
+          <span className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded-lg bg-ink/70 px-2 py-1 text-[11px] font-bold text-white backdrop-blur-sm">
+            <svg viewBox="0 0 24 24" className="h-3 w-3" aria-hidden="true" fill="currentColor">
+              <path d="M8 5.5v13l11-6.5z" />
+            </svg>
+            {duration ?? "Video"}
+          </span>
         ) : null}
       </div>
       <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 pt-2 text-xs">
         <span className="label text-muted">From the week</span>
         <span className="text-muted">
-          {photo.uploadedBy}
+          {memory.uploadedBy}
           {" · "}
           <RelativeTime
-            iso={photo.createdAt.toISOString()}
-            initial={relativeTime(photo.createdAt)}
+            iso={memory.createdAt.toISOString()}
+            initial={relativeTime(memory.createdAt)}
           />
         </span>
       </p>

@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { bringingItems, pets, petEvents, photos, shoppingItems, type Member } from "@/db/schema";
+import { bringingItems, media, pets, petEvents, shoppingItems, type Member } from "@/db/schema";
 import { cleanupMembers, createTestMember } from "./helpers";
 
 /**
@@ -29,7 +29,7 @@ const { addBringingItem, deleteBringingItem, setPacked, updateBringingItem } = a
 const { recordPetEvent, deletePetEvent, updatePetEventTime } = await import(
   "@/app/(app)/dogs/actions"
 );
-const { deletePhoto } = await import("@/app/(app)/photos/actions");
+const { deleteMemory } = await import("@/app/(app)/memories/actions");
 const { getOpenShoppingItems } = await import("@/lib/shopping");
 const { getBringingItems } = await import("@/lib/bringing");
 const { getDogStatuses, getRecentEvents } = await import("@/lib/dogs");
@@ -263,12 +263,13 @@ describe("dogs", () => {
   });
 });
 
-describe("photos", () => {
+describe("memories", () => {
   async function insertPhoto(ownerId: string) {
     const [row] = await db
-      .insert(photos)
+      .insert(media)
       .values({
-        originalKey: "photos/test/original/test.jpg",
+        kind: "image",
+        originalKey: "memories/test/original/test.jpg",
         originalFilename: "test.jpg",
         originalContentType: "image/jpeg",
         originalBytes: 1234,
@@ -279,28 +280,29 @@ describe("photos", () => {
     return row!;
   }
 
-  it("lets the uploader delete their own photo but not another member's", async () => {
+  it("lets the uploader delete their own memory but not another member's", async () => {
     const photo = await insertPhoto(alice.id);
 
     currentMember = bob;
-    expect(await deletePhoto(photo.id)).toMatchObject({ ok: false });
+    expect(await deleteMemory(photo.id)).toMatchObject({ ok: false });
 
     currentMember = alice;
-    expect(await deletePhoto(photo.id)).toEqual({ ok: true });
-    expect(await db.select().from(photos).where(eq(photos.id, photo.id))).toHaveLength(0);
+    expect(await deleteMemory(photo.id)).toEqual({ ok: true });
+    expect(await db.select().from(media).where(eq(media.id, photo.id))).toHaveLength(0);
   });
 
-  it("lets an admin delete any photo", async () => {
+  it("lets an admin delete any memory", async () => {
     const photo = await insertPhoto(alice.id);
     currentMember = admin;
-    expect(await deletePhoto(photo.id)).toEqual({ ok: true });
+    expect(await deleteMemory(photo.id)).toEqual({ ok: true });
   });
 
   it("keeps the original when derivative processing failed", async () => {
     const [row] = await db
-      .insert(photos)
+      .insert(media)
       .values({
-        originalKey: "photos/test/original/broken.heic",
+        kind: "image",
+        originalKey: "memories/test/original/broken.heic",
         originalFilename: "broken.heic",
         originalContentType: "image/heic",
         originalBytes: 999,
@@ -310,13 +312,39 @@ describe("photos", () => {
       })
       .returning();
 
-    const [stored] = await db.select().from(photos).where(eq(photos.id, row!.id));
-    expect(stored!.originalKey).toBe("photos/test/original/broken.heic");
+    const [stored] = await db.select().from(media).where(eq(media.id, row!.id));
+    expect(stored!.originalKey).toBe("memories/test/original/broken.heic");
     expect(stored!.displayKey).toBeNull();
     expect(stored!.thumbnailKey).toBeNull();
     expect(stored!.processingStatus).toBe("failed");
 
     currentMember = alice;
-    await deletePhoto(row!.id);
+    await deleteMemory(row!.id);
+  });
+
+  it("stores a video with its poster and clears every object on delete", async () => {
+    const [row] = await db
+      .insert(media)
+      .values({
+        kind: "video",
+        originalKey: "memories/test/original/clip.mov",
+        posterKey: "memories/test/poster.jpg",
+        originalFilename: "clip.mov",
+        originalContentType: "video/quicktime",
+        originalBytes: 8_000_000,
+        originalWidth: 1080,
+        originalHeight: 1920,
+        durationSeconds: 14,
+        uploadedByMemberId: alice.id,
+        processingStatus: "ready",
+      })
+      .returning();
+
+    expect(row!.kind).toBe("video");
+    expect(row!.durationSeconds).toBe(14);
+
+    currentMember = alice;
+    expect(await deleteMemory(row!.id)).toEqual({ ok: true });
+    expect(await db.select().from(media).where(eq(media.id, row!.id))).toHaveLength(0);
   });
 });

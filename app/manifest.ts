@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Rock Cottage",
     short_name: "Rock Cottage",
-    description: "Meals, Alice, shopping and photos for the week at the cottage.",
+    description: "Meals, Alice, shopping and memories from the week at the cottage.",
     start_url: "/",
     scope: "/",
     display: "standalone",

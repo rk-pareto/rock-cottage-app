@@ -3,8 +3,8 @@
 A small, private web app for the five of us at The Rock Cut Cottage in Port
 Carling — **August 31 to September 6, 2026**.
 
-Meals, Alice, the shopping list, photos, who's bringing what, and the cottage
-info you always need and can never find. Mobile first; installs to a phone home
+Meals, Alice, the shopping list, memories, who's bringing what, and the
+cottage info you always need and can never find. Mobile first; installs to a phone home
 screen.
 
 **Production:** https://web-production-7f9f0.up.railway.app
@@ -15,11 +15,11 @@ screen.
 
 | Screen | Route | What it does |
 |---|---|---|
-| Home | `/` | Upcoming meals, Alice's status, shopping summary, recent photos |
+| Home | `/` | Upcoming meals, Alice's status, shopping summary, recent memories |
 | Meals | `/meals` | The whole week, read-only, with deeply pretentious descriptions |
 | Alice | `/dogs` | Three big buttons: out, pooped, fed. One tap, recorded under your name |
 | Shopping | `/shopping` | Add something, anyone can mark it picked up |
-| Photos | `/photos` | Everyone's photos; originals preserved exactly |
+| Memories | `/memories` | Everyone's photos and videos; originals preserved exactly |
 | We're Bringing | `/bringing` | Claim the ketchup so we don't end up with four |
 | Cottage Info | `/info` | Address, wifi, emergency — Markdown files, not a database |
 | Account | `/account` | Your details and sign out |
@@ -38,7 +38,7 @@ Phone ──► Railway (Next.js 16, App Router)
              │
              ├─► Neon Postgres        application tables, via Drizzle
              ├─► Neon Auth            magic link, Better Auth under the hood
-             └─► Railway Bucket       private S3, photo originals + derivatives
+             └─► Railway Bucket       private S3, originals + derivatives
 ```
 
 - **No** Redis, job queue, separate API server, CMS, WebSockets, or runtime AI.
@@ -52,7 +52,7 @@ Phone ──► Railway (Next.js 16, App Router)
 ```
 app/(app)/        authenticated screens; the layout enforces membership
 app/auth/         sign-in, check-email, magic-link callback
-app/api/          auth proxy, health, photo upload/download
+app/api/          auth proxy, health, memory upload/download
 db/               Drizzle schema, migrations, idempotent seed
 lib/auth/         membership guard — the allowlist lives here
 lib/storage/      S3 client + Sharp image processing
@@ -153,14 +153,15 @@ session, never from the browser.
 
 ---
 
-## Photos
+## Memories
 
-The original upload is sacred. It is stored exactly as the phone sent it —
-never recompressed, resized, or re-encoded.
+Photos and videos share one screen, one table (`media`) and one delete rule.
+The original upload is sacred either way: it is stored exactly as the phone
+sent it — never recompressed, resized, or re-encoded.
 
-1. Client asks `/api/photos/upload-intent` for a presigned PUT.
+1. Client asks `/api/memories/upload-intent` for a presigned PUT.
 2. Browser uploads the original **straight to the bucket**, not through Next.
-3. `/api/photos/[id]/complete` reads it back and generates:
+3. `/api/memories/[id]/complete` reads it back and generates:
    - `display.webp` — longest edge 2560px
    - `thumbnail.webp` — longest edge 640px
 4. Row becomes `ready`.
@@ -174,6 +175,24 @@ iPhones default to HEIC, `lib/storage/process.ts` falls back to `heic-decode`
 (libheif via WASM) and hands sharp raw pixels. Covered by
 `tests/images.test.ts` against a real HEIC file.
 
+### Videos
+
+Clips are stored and played back exactly as recorded — no transcoding, so
+**there is no ffmpeg in the deploy**. Instead the browser does the one thing a
+server would have needed a video decoder for: before uploading, it reads the
+clip's dimensions and length and draws a frame to a canvas. That JPEG is PUT
+alongside the clip and becomes the poster, the thumbnail and the tile in the
+home feed — the server only ever processes a still.
+
+- Up to 512 MB per clip (photos stay at 60 MB); uploads show a real progress bar.
+- `/api/memories/[id]/view` redirects a clip straight at the bucket so S3 serves
+  the range requests that scrubbing and buffering depend on.
+- Share hands the OS the clip untouched, and is hidden above 64 MB — past that
+  a phone can't hold the file in memory and Download is the honest option.
+- If the browser can't decode the clip (an HEVC `.mov` opened in Chrome, say),
+  it uploads with no poster and shows a placeholder tile. The clip is intact and
+  still plays wherever its codec is supported.
+
 The bucket is private. Only short-lived presigned URLs ever reach the browser,
 and credentials are server-side only. To verify that end to end:
 
@@ -181,8 +200,11 @@ and credentials are server-side only. To verify that end to end:
 RUN_BUCKET_SMOKE=1 npx vitest run tests/bucket.smoke.test.ts
 ```
 
-It writes under `photos/_smoketest-*`, asserts the original round-trips
+It writes under `memories/_smoketest-*`, asserts the original round-trips
 byte-identically, and asserts an unsigned URL is rejected.
+
+New objects land under `memories/`; anything uploaded before the rename still
+lives under `photos/` and is found by the key stored on its row.
 
 ---
 

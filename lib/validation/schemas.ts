@@ -50,10 +50,71 @@ export const IMAGE_CONTENT_TYPES = [
   "image/avif",
 ] as const;
 
-export const MAX_PHOTO_BYTES = 60 * 1024 * 1024; // 60 MB — generous for a RAW-ish HEIC
+/**
+ * Videos we accept. `video/quicktime` is what an iPhone hands over for a .mov
+ * and is the common case here; the clip is stored and played back exactly as
+ * recorded, so playback depends on the viewing browser's own codec support.
+ */
+export const VIDEO_CONTENT_TYPES = [
+  "video/mp4",
+  "video/quicktime",
+  "video/webm",
+  "video/x-m4v",
+  "video/3gpp",
+] as const;
 
-export const uploadIntentSchema = z.object({
-  filename: z.string().trim().min(1).max(300),
-  contentType: z.string().trim().toLowerCase().pipe(z.enum(IMAGE_CONTENT_TYPES)),
-  bytes: z.number().int().positive().max(MAX_PHOTO_BYTES),
-});
+export const MAX_PHOTO_BYTES = 60 * 1024 * 1024; // 60 MB — generous for a RAW-ish HEIC
+export const MAX_VIDEO_BYTES = 512 * 1024 * 1024; // 512 MB — a couple of minutes of 4K
+
+/**
+ * The OS share sheet needs the whole file in memory as a `File`, which a phone
+ * will not do for a large clip. Past this, Download is the honest option.
+ */
+export const MAX_SHAREABLE_VIDEO_BYTES = 64 * 1024 * 1024;
+
+export type UploadKind = "image" | "video";
+
+export function kindForContentType(contentType: string): UploadKind | null {
+  const normalized = contentType.trim().toLowerCase();
+  if ((IMAGE_CONTENT_TYPES as readonly string[]).includes(normalized)) return "image";
+  if ((VIDEO_CONTENT_TYPES as readonly string[]).includes(normalized)) return "video";
+  return null;
+}
+
+export function maxBytesFor(kind: UploadKind): number {
+  return kind === "video" ? MAX_VIDEO_BYTES : MAX_PHOTO_BYTES;
+}
+
+/** Whole positive pixels, ignored rather than rejected when a browser lies. */
+const dimensionSchema = z.number().int().positive().max(100_000).optional();
+
+export const uploadIntentSchema = z
+  .object({
+    filename: z.string().trim().min(1).max(300),
+    contentType: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .refine((v) => kindForContentType(v) !== null, "That file type isn't supported."),
+    bytes: z.number().int().positive(),
+    // Videos carry what the browser already knows about the clip, so the
+    // server never has to open it: the still is what gets processed.
+    width: dimensionSchema,
+    height: dimensionSchema,
+    durationSeconds: z.number().nonnegative().max(24 * 60 * 60).optional(),
+    /** Whether a poster frame will follow, so the intent can presign for it. */
+    hasPoster: z.boolean().optional(),
+  })
+  .superRefine((value, ctx) => {
+    const kind = kindForContentType(value.contentType);
+    if (!kind) return; // already reported by the contentType refinement
+    const max = maxBytesFor(kind);
+    if (value.bytes > max) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["bytes"],
+        message: `That ${kind === "video" ? "video" : "photo"} is larger than ${Math.round(max / (1024 * 1024))} MB.`,
+      });
+    }
+  })
+  .transform((value) => ({ ...value, kind: kindForContentType(value.contentType)! }));

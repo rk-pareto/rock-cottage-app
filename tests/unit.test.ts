@@ -9,12 +9,19 @@ import {
   relativeTime,
   toCottageInputValue,
 } from "@/lib/time";
-import { itemNameSchema, occurredAtSchema, uploadIntentSchema } from "@/lib/validation/schemas";
+import {
+  itemNameSchema,
+  kindForContentType,
+  MAX_PHOTO_BYTES,
+  MAX_VIDEO_BYTES,
+  occurredAtSchema,
+  uploadIntentSchema,
+} from "@/lib/validation/schemas";
 import { groupByDate, type MealRow } from "@/lib/meals";
 import {
   interleaveFeed,
-  photoDrawCount,
-  photoDrawSeed,
+  memoryDrawCount,
+  memoryDrawSeed,
   pickSeeded,
 } from "@/lib/feed";
 
@@ -104,11 +111,12 @@ describe("validation", () => {
     expect(occurredAtSchema.safeParse("not a time").success).toBe(false);
   });
 
-  it("only accepts image uploads of a sane size", () => {
+  it("only accepts photo and video uploads of a sane size", () => {
     const base = { filename: "IMG_1234.HEIC", bytes: 4_000_000 };
     expect(uploadIntentSchema.safeParse({ ...base, contentType: "image/heic" }).success).toBe(true);
     expect(uploadIntentSchema.safeParse({ ...base, contentType: "IMAGE/JPEG" }).success).toBe(true);
-    expect(uploadIntentSchema.safeParse({ ...base, contentType: "video/mp4" }).success).toBe(false);
+    expect(uploadIntentSchema.safeParse({ ...base, contentType: "video/mp4" }).success).toBe(true);
+    expect(uploadIntentSchema.safeParse({ ...base, contentType: "audio/mpeg" }).success).toBe(false);
     expect(
       uploadIntentSchema.safeParse({ ...base, contentType: "image/jpeg", bytes: 999_000_000 })
         .success,
@@ -132,11 +140,11 @@ describe("meal grouping", () => {
 
 describe("home feed", () => {
   const meals = ["m1", "m2", "m3", "m4", "m5"];
-  const photos = ["p1", "p2", "p3"];
+  const memories = ["p1", "p2", "p3"];
 
-  it("drops a photo in after every second meal", () => {
-    const feed = interleaveFeed(meals, photos.slice(0, 2));
-    expect(feed.map((i) => (i.kind === "meal" ? i.meal : `(${i.photo})`))).toEqual([
+  it("drops a memory in after every second meal", () => {
+    const feed = interleaveFeed(meals, memories.slice(0, 2));
+    expect(feed.map((i) => (i.kind === "meal" ? i.meal : `(${i.memory})`))).toEqual([
       "m1",
       "m2",
       "(p1)",
@@ -147,30 +155,30 @@ describe("home feed", () => {
     ]);
   });
 
-  it("still shows photos when the meal schedule has run out", () => {
-    const feed = interleaveFeed([], photos);
-    expect(feed.every((i) => i.kind === "photo")).toBe(true);
+  it("still shows memories when the meal schedule has run out", () => {
+    const feed = interleaveFeed([], memories);
+    expect(feed.every((i) => i.kind === "memory")).toBe(true);
     expect(feed).toHaveLength(3);
   });
 
-  it("never drops a drawn photo", () => {
-    const feed = interleaveFeed(["m1"], photos);
-    expect(feed.filter((i) => i.kind === "photo")).toHaveLength(3);
+  it("never drops a drawn memory", () => {
+    const feed = interleaveFeed(["m1"], memories);
+    expect(feed.filter((i) => i.kind === "memory")).toHaveLength(3);
   });
 
-  it("draws between one and three photos", () => {
-    expect(photoDrawCount(0)).toBe(1);
-    expect(photoDrawCount(5)).toBe(2);
-    expect(photoDrawCount(20)).toBe(3);
+  it("draws between one and three memories", () => {
+    expect(memoryDrawCount(0)).toBe(1);
+    expect(memoryDrawCount(5)).toBe(2);
+    expect(memoryDrawCount(20)).toBe(3);
   });
 
-  it("draws the same photos for the same seed and different ones otherwise", () => {
+  it("draws the same memories for the same seed and different ones otherwise", () => {
     const pool = Array.from({ length: 20 }, (_, i) => `p${i}`);
     expect(pickSeeded(pool, 3, "a")).toEqual(pickSeeded(pool, 3, "a"));
     expect(pickSeeded(pool, 3, "a")).not.toEqual(pickSeeded(pool, 3, "b"));
   });
 
-  it("draws distinct photos and never more than the pool holds", () => {
+  it("draws distinct memories and never more than the pool holds", () => {
     const pool = ["a", "b", "c"];
     const drawn = pickSeeded(pool, 10, "seed");
     expect(new Set(drawn).size).toBe(3);
@@ -181,7 +189,53 @@ describe("home feed", () => {
     const start = new Date("2026-08-24T14:00:00Z");
     const later = new Date("2026-08-24T14:30:00Z");
     const nextHour = new Date("2026-08-24T15:00:00Z");
-    expect(photoDrawSeed(later)).toBe(photoDrawSeed(start));
-    expect(photoDrawSeed(nextHour)).not.toBe(photoDrawSeed(start));
+    expect(memoryDrawSeed(later)).toBe(memoryDrawSeed(start));
+    expect(memoryDrawSeed(nextHour)).not.toBe(memoryDrawSeed(start));
+  });
+});
+
+describe("upload intent", () => {
+  const photo = { filename: "IMG_0001.HEIC", contentType: "image/heic", bytes: 4_000_000 };
+  const video = { filename: "IMG_0002.MOV", contentType: "video/quicktime", bytes: 90_000_000 };
+
+  it("sorts a content type into the kind it belongs to", () => {
+    expect(kindForContentType("image/heic")).toBe("image");
+    expect(kindForContentType("VIDEO/MP4 ")).toBe("video");
+    expect(kindForContentType("application/pdf")).toBeNull();
+  });
+
+  it("tags a still as an image and a clip as a video", () => {
+    expect(uploadIntentSchema.parse(photo).kind).toBe("image");
+    expect(uploadIntentSchema.parse(video).kind).toBe("video");
+  });
+
+  it("rejects anything that is neither", () => {
+    expect(
+      uploadIntentSchema.safeParse({ ...photo, contentType: "application/pdf" }).success,
+    ).toBe(false);
+  });
+
+  it("holds videos to their own size limit, not the photo one", () => {
+    // A clip larger than any photo may pass; a photo that size may not.
+    expect(uploadIntentSchema.safeParse({ ...video, bytes: MAX_PHOTO_BYTES + 1 }).success).toBe(
+      true,
+    );
+    expect(uploadIntentSchema.safeParse({ ...photo, bytes: MAX_PHOTO_BYTES + 1 }).success).toBe(
+      false,
+    );
+    expect(uploadIntentSchema.safeParse({ ...video, bytes: MAX_VIDEO_BYTES + 1 }).success).toBe(
+      false,
+    );
+  });
+
+  it("carries the clip details the browser measured", () => {
+    const parsed = uploadIntentSchema.parse({
+      ...video,
+      width: 1080,
+      height: 1920,
+      durationSeconds: 13.6,
+      hasPoster: true,
+    });
+    expect(parsed).toMatchObject({ width: 1080, height: 1920, durationSeconds: 13.6, hasPoster: true });
   });
 });

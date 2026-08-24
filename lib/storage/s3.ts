@@ -111,18 +111,40 @@ export async function deleteObjects(keys: string[]): Promise<void> {
 }
 
 /**
- * Keys are always built server-side from the photo UUID (spec §14.4) — the
+ * Keys are always built server-side from the memory UUID (spec §14.4) — the
  * client never chooses where its bytes land. Sanitisation only affects the
  * key; the stored bytes and the recorded original filename are untouched.
+ *
+ * New objects land under `memories/`; anything uploaded before the rename
+ * still lives under `photos/` and is found by the key stored on its row.
  */
-export function originalKey(photoId: string, filename: string): string {
+export function originalKey(memoryId: string, filename: string): string {
   const safe =
     filename
       .replace(/[^a-zA-Z0-9._-]/g, "_")
       .replace(/_{2,}/g, "_")
       .slice(-120) || "upload";
-  return `photos/${photoId}/original/${safe}`;
+  return `memories/${memoryId}/original/${safe}`;
 }
 
-export const displayKey = (photoId: string) => `photos/${photoId}/display.webp`;
-export const thumbnailKey = (photoId: string) => `photos/${photoId}/thumbnail.webp`;
+export const displayKey = (memoryId: string) => `memories/${memoryId}/display.webp`;
+export const thumbnailKey = (memoryId: string) => `memories/${memoryId}/thumbnail.webp`;
+/** The frame the browser grabbed from a video, exactly as it was sent. */
+export const posterKey = (memoryId: string) => `memories/${memoryId}/poster.jpg`;
+
+/**
+ * Stream an object straight through instead of buffering it. Videos are far
+ * too big to hold in the container's memory just to hand them to a client.
+ */
+export async function getObjectStream(
+  key: string,
+): Promise<{ body: ReadableStream<Uint8Array>; contentType?: string; contentLength?: number }> {
+  const response = await s3().send(new GetObjectCommand({ Bucket: BUCKET_NAME, Key: key }));
+  const body = response.Body?.transformToWebStream();
+  if (!body) throw new Error(`Object ${key} had no body`);
+  return {
+    body: body as ReadableStream<Uint8Array>,
+    contentType: response.ContentType,
+    contentLength: response.ContentLength,
+  };
+}

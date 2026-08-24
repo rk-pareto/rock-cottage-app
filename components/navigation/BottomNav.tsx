@@ -59,12 +59,15 @@ export function BottomNav({ dogsLabel }: { dogsLabel: string }) {
       ),
     },
     {
-      href: "/photos",
-      label: "Photos",
+      href: "/memories",
+      label: "Memories",
+      // Two stacked frames with a play mark: this tab holds photos and clips,
+      // and a camera glyph would only claim half of that.
       icon: (
         <Icon>
-          <path d="M3.5 8.5a1.8 1.8 0 0 1 1.8-1.8h2.2l1.3-2h6.4l1.3 2h2.2a1.8 1.8 0 0 1 1.8 1.8v9a1.8 1.8 0 0 1-1.8 1.8H5.3a1.8 1.8 0 0 1-1.8-1.8z" />
-          <circle cx="12" cy="13" r="3.4" />
+          <path d="M7.5 4.5h11a1.8 1.8 0 0 1 1.8 1.8v8.4" />
+          <rect x="3.5" y="7.5" width="13" height="12" rx="1.8" />
+          <path d="M8.5 11.5v4l4-2z" />
         </Icon>
       ),
     },

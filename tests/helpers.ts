@@ -1,6 +1,6 @@
 import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { bringingItems, members, petEvents, photos, shoppingItems } from "@/db/schema";
+import { bringingItems, media, members, petEvents, shoppingItems } from "@/db/schema";
 import type { Member } from "@/db/schema";
 
 /** Distinct from the seeded cottage members so tests never disturb real rows. */
@@ -26,7 +26,7 @@ export async function createTestMember(
 export async function cleanupMembers(ids: string[]): Promise<void> {
   if (ids.length === 0) return;
   await db.delete(petEvents).where(inArray(petEvents.recordedByMemberId, ids));
-  await db.delete(photos).where(inArray(photos.uploadedByMemberId, ids));
+  await db.delete(media).where(inArray(media.uploadedByMemberId, ids));
   await db.delete(bringingItems).where(inArray(bringingItems.responsibleMemberId, ids));
   await db.delete(shoppingItems).where(inArray(shoppingItems.requestedByMemberId, ids));
   for (const id of ids) {

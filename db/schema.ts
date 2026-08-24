@@ -21,9 +21,14 @@ export type MealType = (typeof MEAL_TYPES)[number];
 export const PET_EVENT_TYPES = ["outside", "poop", "fed"] as const;
 export type PetEventType = (typeof PET_EVENT_TYPES)[number];
 
-/** Photo processing states (spec §14.8). */
+/** Memory processing states (spec §14.8). */
 export const PROCESSING_STATES = ["pending", "processing", "ready", "failed"] as const;
 export type ProcessingState = (typeof PROCESSING_STATES)[number];
+
+/** What a memory actually is. Stills and clips share one table because the
+ *  gallery, the home feed and the delete rules treat them identically. */
+export const MEDIA_KINDS = ["image", "video"] as const;
+export type MediaKind = (typeof MEDIA_KINDS)[number];
 
 const createdAt = timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
 const updatedAt = timestamp("updated_at", { withTimezone: true }).notNull().defaultNow();
@@ -156,18 +161,28 @@ export const bringingItems = pgTable(
   ],
 );
 
-export const photos = pgTable(
-  "photos",
+/**
+ * Memories: the photos and videos everyone uploads. Still called `media` in
+ * the database because "memory" is the word on screen, not a storage concept.
+ */
+export const media = pgTable(
+  "media",
   {
     id: uuid("id").primaryKey().defaultRandom(),
+    kind: varchar("kind", { length: 10 }).notNull().default("image").$type<MediaKind>(),
     originalKey: text("original_key").notNull(),
+    /** Images: the optimized WebP. Videos: the WebP made from the poster. */
     displayKey: text("display_key"),
     thumbnailKey: text("thumbnail_key"),
+    /** Videos only: the frame the browser grabbed at upload time, as sent. */
+    posterKey: text("poster_key"),
     originalFilename: text("original_filename").notNull(),
     originalContentType: varchar("original_content_type", { length: 120 }).notNull(),
     originalBytes: bigint("original_bytes", { mode: "number" }).notNull(),
     originalWidth: integer("original_width"),
     originalHeight: integer("original_height"),
+    /** Videos only, rounded to whole seconds — just for the duration badge. */
+    durationSeconds: integer("duration_seconds"),
     uploadedByMemberId: uuid("uploaded_by_member_id")
       .notNull()
       .references(() => members.id, { onDelete: "restrict" }),
@@ -180,8 +195,8 @@ export const photos = pgTable(
     updatedAt,
   },
   (t) => [
-    index("photos_created_at_idx").on(t.createdAt.desc()),
-    index("photos_status_created_at_idx").on(t.processingStatus, t.createdAt.desc()),
+    index("media_created_at_idx").on(t.createdAt.desc()),
+    index("media_status_created_at_idx").on(t.processingStatus, t.createdAt.desc()),
   ],
 );
 
@@ -191,4 +206,4 @@ export type Pet = typeof pets.$inferSelect;
 export type PetEvent = typeof petEvents.$inferSelect;
 export type ShoppingItem = typeof shoppingItems.$inferSelect;
 export type BringingItem = typeof bringingItems.$inferSelect;
-export type Photo = typeof photos.$inferSelect;
+export type Media = typeof media.$inferSelect;

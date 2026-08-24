@@ -11,7 +11,7 @@ const MEAL_TYPE_ORDER: Record<string, number> = { breakfast: 1, lunch: 2, dinner
  * members, pets, meals or assignments. Natural keys: member email, pet slug,
  * and meal (date + type + title).
  *
- * Note this never touches shopping, dog events, photos or bringing — those are
+ * Note this never touches shopping, dog events, memories or bringing — those are
  * live user data.
  */
 async function seed() {

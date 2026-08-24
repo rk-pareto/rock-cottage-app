@@ -1,13 +1,14 @@
 /**
- * Home-feed assembly (spec §8.1). Meals are the spine of the feed; photos are
- * dropped in between them as a random selection, not a timeline — the meals
- * look forward and the photos look back, so they're deliberately unrelated.
+ * Home-feed assembly (spec §8.1). Meals are the spine of the feed; memories
+ * are dropped in between them as a random selection, not a timeline — the
+ * meals look forward and the memories look back, so they're deliberately
+ * unrelated.
  *
  * Pure on purpose: the page fetches the rows, this decides the arrangement.
  */
 
 export type FeedItem<M, P> =
-  { kind: "meal"; meal: M } | { kind: "photo"; photo: P };
+  { kind: "meal"; meal: M } | { kind: "memory"; memory: P };
 
 /** xmur3: string → 32-bit seed. */
 function hashSeed(seed: string): number {
@@ -48,23 +49,23 @@ export function pickSeeded<T>(items: T[], count: number, seed: string): T[] {
  * (spec §8.2) and a fresh draw each time would make the page flicker, so the
  * selection only turns over on the hour.
  */
-export function photoDrawSeed(now: Date = new Date()): string {
+export function memoryDrawSeed(now: Date = new Date()): string {
   return String(Math.floor(now.getTime() / 3_600_000));
 }
 
-/** How many photos to weave into a feed carrying `mealCount` meals. */
-export function photoDrawCount(mealCount: number, every = 2): number {
+/** How many memories to weave into a feed carrying `mealCount` meals. */
+export function memoryDrawCount(mealCount: number, every = 2): number {
   return Math.min(3, Math.max(1, Math.floor(mealCount / every)));
 }
 
 /**
- * Deal photos into the meal stack — one after every `every` meals, so no card
- * sits alone and the feed keeps a rhythm. Leftover photos (a short meal
- * schedule, or none at all) go on the end rather than being dropped.
+ * Deal memories into the meal stack — one after every `every` meals, so no
+ * card sits alone and the feed keeps a rhythm. Leftover memories (a short
+ * meal schedule, or none at all) go on the end rather than being dropped.
  */
 export function interleaveFeed<M, P>(
   meals: M[],
-  photos: P[],
+  memories: P[],
   every = 2,
 ): FeedItem<M, P>[] {
   const items: FeedItem<M, P>[] = [];
@@ -72,12 +73,12 @@ export function interleaveFeed<M, P>(
 
   meals.forEach((meal, index) => {
     items.push({ kind: "meal", meal });
-    if ((index + 1) % every === 0 && next < photos.length) {
-      items.push({ kind: "photo", photo: photos[next++] });
+    if ((index + 1) % every === 0 && next < memories.length) {
+      items.push({ kind: "memory", memory: memories[next++] });
     }
   });
 
-  for (; next < photos.length; next++)
-    items.push({ kind: "photo", photo: photos[next] });
+  for (; next < memories.length; next++)
+    items.push({ kind: "memory", memory: memories[next] });
   return items;
 }

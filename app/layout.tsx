@@ -14,7 +14,7 @@ const instrumentSerif = Instrument_Serif({
 
 export const metadata: Metadata = {
   title: "Rock Cottage",
-  description: "Meals, Alice, shopping and photos for the week at the cottage.",
+  description: "Meals, Alice, shopping and memories from the week at the cottage.",
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, statusBarStyle: "default", title: "Rock Cottage" },
   icons: { icon: "/icon.svg", apple: "/apple-icon.png" },
