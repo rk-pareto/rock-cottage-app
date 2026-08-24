@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import { RelativeTime } from "@/components/ui/RelativeTime";
 import { EmptyWell } from "@/components/ui/Card";
+import { Check } from "@/components/ui/icons";
 import { relativeTime } from "@/lib/time";
 import { addShoppingItem, deleteShoppingItem, setPickedUp } from "./actions";
 
@@ -239,23 +240,5 @@ export function ShoppingClient({
         </div>
       ) : null}
     </>
-  );
-}
-
-/** A drawn tick, so the checkbox doesn't depend on a text glyph's metrics. */
-function Check() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      className="h-5 w-5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2.4}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="m5 12.5 4.5 4.5L19 7" />
-    </svg>
   );
 }

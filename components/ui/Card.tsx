@@ -62,7 +62,7 @@ export function SectionLabel({
 }) {
   return (
     <div className={`flex items-center gap-3 ${className}`}>
-      <span className="label shrink-0 text-muted">{children}</span>
+      <h2 className="label shrink-0 text-muted">{children}</h2>
       <span aria-hidden="true" className="h-px flex-1 bg-line" />
       {href ? (
         <Link

@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import { EmptyWell } from "@/components/ui/Card";
+import { Check } from "@/components/ui/icons";
 import {
   addBringingItem,
   deleteBringingItem,
@@ -273,23 +274,5 @@ export function BringingClient({
         </div>
       )}
     </>
-  );
-}
-
-/** A drawn tick, so the checkbox doesn't depend on a text glyph's metrics. */
-function Check() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      className="h-5 w-5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2.4}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="m5 12.5 4.5 4.5L19 7" />
-    </svg>
   );
 }

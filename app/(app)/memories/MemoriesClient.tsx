@@ -4,6 +4,7 @@ import { useCallback, useRef, useState, useSyncExternalStore, useTransition } fr
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import { deleteMemory } from "./actions";
+import { PlayGlyph } from "@/components/ui/icons";
 
 export type MemoryCardData = {
   id: string;
@@ -453,13 +454,6 @@ export function MemoriesClient({
   );
 }
 
-function PlayGlyph({ className = "" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} aria-hidden="true" fill="currentColor">
-      <path d="M8 5.5v13l11-6.5z" />
-    </svg>
-  );
-}
 
 const subscribeNever = () => () => {};
 

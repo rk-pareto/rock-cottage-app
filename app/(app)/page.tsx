@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Card, EmptyState, SectionLabel } from "@/components/ui/Card";
+import { PlayGlyph } from "@/components/ui/icons";
 import { RelativeTime } from "@/components/ui/RelativeTime";
 import { requireMember } from "@/lib/auth/membership";
 import { getDogStatuses } from "@/lib/dogs";
@@ -215,9 +216,7 @@ function MemoryBreak({ memory }: { memory: MemoryCard }) {
         ) : null}
         {memory.kind === "video" ? (
           <span className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded-lg bg-ink/70 px-2 py-1 text-[11px] font-bold text-white backdrop-blur-sm">
-            <svg viewBox="0 0 24 24" className="h-3 w-3" aria-hidden="true" fill="currentColor">
-              <path d="M8 5.5v13l11-6.5z" />
-            </svg>
+            <PlayGlyph className="h-3 w-3" />
             {duration ?? "Video"}
           </span>
         ) : null}
