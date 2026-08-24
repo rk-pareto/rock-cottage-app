@@ -51,7 +51,7 @@ Phone ──► Railway (Next.js 16, App Router)
 
 ```
 app/(app)/        authenticated screens; the layout enforces membership
-app/auth/         sign-in + check-email
+app/auth/         sign-in, check-email, magic-link callback
 app/api/          auth proxy, health, photo upload/download
 db/               Drizzle schema, migrations, idempotent seed
 lib/auth/         membership guard — the allowlist lives here
@@ -105,6 +105,34 @@ production, so magic links can't be redirected off-site.
 | `npm test` | Business-rule tests |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
+
+---
+
+## Signing in
+
+A magic link takes four hops, and the third one is easy to get wrong:
+
+```
+browser  ──POST /api/auth/sign-in/magic-link──►  our proxy ──►  Neon Auth
+                                                                    │ email
+tap the link  ──────────────────────────────────────────────►  Neon Auth
+                                                                    │ 302
+browser  ◄──  /auth/callback?neon_auth_session_verifier=…  ─────────┘
+         ──►  our route exchanges the verifier for a session cookie ──► /
+```
+
+The emailed link points at **Neon's** host, so the cookie Neon sets there is
+useless to us. What crosses back is a one-time verifier on the callback URL,
+and `app/auth/callback/route.ts` trades it for a session cookie on our own
+domain. Without that exchange a perfectly valid link just lands you back on the
+sign-in screen, forever.
+
+Both the link and its callback are built from the request `Origin`, which is
+why the browser — not the server — posts the sign-in request, and why
+`callbackURL` stays relative (an absolute one is rejected as
+`INVALID_CALLBACK_URL`). Links last 30 minutes and work once; a link a mail
+client opened first comes back as `?error=INVALID_TOKEN`, which the sign-in
+page explains.
 
 ---
 

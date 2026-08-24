@@ -18,19 +18,22 @@ export function SignInForm() {
     setError(null);
     try {
       /*
-       * Posted from the browser to our own Neon Auth proxy on purpose. The
-       * magic-link URL is built from the request's `Origin` header, and only a
-       * real browser request carries one — behind Railway's proxy the
-       * server-side fallback (`new URL(request.url).origin`) resolves to the
-       * container's internal address and the emailed link points at localhost.
+       * Posted from the browser to our own Neon Auth proxy on purpose. Neon
+       * builds both the magic-link URL and its callback from the request's
+       * `Origin` header, and only a real browser request carries one — behind
+       * Railway's proxy the server-side fallback
+       * (`new URL(request.url).origin`) resolves to the container's internal
+       * address and the emailed link points at localhost.
        *
        * `callbackURL` must stay relative; an absolute URL is rejected as
-       * INVALID_CALLBACK_URL even when that exact origin is whitelisted.
+       * INVALID_CALLBACK_URL even when that exact origin is whitelisted. Neon
+       * expands it against the origin and appends the one-time verifier that
+       * `/auth/callback` trades for a session cookie on this domain.
        */
       const response = await fetch("/api/auth/sign-in/magic-link", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email: trimmed, callbackURL: "/" }),
+        body: JSON.stringify({ email: trimmed, callbackURL: "/auth/callback" }),
       });
 
       if (!response.ok) {

@@ -3,7 +3,7 @@ import { cache } from "react";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { members, type Member } from "@/db/schema";
-import { auth } from "./neon-auth";
+import { getSessionUser } from "./neon-auth";
 
 export type MembershipResult =
   | { state: "unauthenticated" }
@@ -19,8 +19,7 @@ export type MembershipResult =
  * several sections only hits the database once.
  */
 export const getMembership = cache(async (): Promise<MembershipResult> => {
-  const { data: session } = await auth.getSession();
-  const user = session?.user;
+  const user = await getSessionUser();
   if (!user) return { state: "unauthenticated" };
 
   const email = user.email?.trim().toLowerCase() ?? null;
