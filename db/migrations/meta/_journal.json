@@ -15,6 +15,13 @@
       "when": 1787587200000,
       "tag": "0001_memories_media",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787587260000,
+      "tag": "0002_meal_photos_and_favorites",
+      "breakpoints": true
     }
   ]
 }

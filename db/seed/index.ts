@@ -62,6 +62,7 @@ async function seed() {
         title: meal.title,
         displayDescription: meal.displayDescription,
         practicalNotes: meal.practicalNotes ?? null,
+        photoPath: meal.photo ?? null,
         sortOrder: MEAL_TYPE_ORDER[meal.mealType] ?? 0,
       })
       .onConflictDoUpdate({
@@ -69,6 +70,7 @@ async function seed() {
         set: {
           displayDescription: meal.displayDescription,
           practicalNotes: meal.practicalNotes ?? null,
+          photoPath: meal.photo ?? null,
           sortOrder: MEAL_TYPE_ORDER[meal.mealType] ?? 0,
           updatedAt: new Date(),
         },

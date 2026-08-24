@@ -130,7 +130,14 @@ describe("meal grouping", () => {
       { mealDate: "2026-08-31", mealType: "dinner", title: "Chili" },
       { mealDate: "2026-09-01", mealType: "breakfast", title: "Pancakes" },
       { mealDate: "2026-09-01", mealType: "dinner", title: "Pizza" },
-    ].map((r, i) => ({ ...r, id: String(i), displayDescription: null, practicalNotes: null, responsible: [] })) as MealRow[];
+    ].map((r, i) => ({
+      ...r,
+      id: String(i),
+      displayDescription: null,
+      practicalNotes: null,
+      photoPath: null,
+      responsible: [],
+    })) as MealRow[];
 
     const groups = groupByDate(rows);
     expect(groups.map((g) => g.date)).toEqual(["2026-08-31", "2026-09-01"]);
