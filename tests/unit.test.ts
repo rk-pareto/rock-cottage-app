@@ -11,6 +11,12 @@ import {
 } from "@/lib/time";
 import { itemNameSchema, occurredAtSchema, uploadIntentSchema } from "@/lib/validation/schemas";
 import { groupByDate, type MealRow } from "@/lib/meals";
+import {
+  interleaveFeed,
+  photoDrawCount,
+  photoDrawSeed,
+  pickSeeded,
+} from "@/lib/feed";
 
 const original = process.env.FEATURE_JUNO_ENABLED;
 afterEach(() => {
@@ -121,5 +127,61 @@ describe("meal grouping", () => {
     const groups = groupByDate(rows);
     expect(groups.map((g) => g.date)).toEqual(["2026-08-31", "2026-09-01"]);
     expect(groups[1]!.meals.map((m) => m.title)).toEqual(["Pancakes", "Pizza"]);
+  });
+});
+
+describe("home feed", () => {
+  const meals = ["m1", "m2", "m3", "m4", "m5"];
+  const photos = ["p1", "p2", "p3"];
+
+  it("drops a photo in after every second meal", () => {
+    const feed = interleaveFeed(meals, photos.slice(0, 2));
+    expect(feed.map((i) => (i.kind === "meal" ? i.meal : `(${i.photo})`))).toEqual([
+      "m1",
+      "m2",
+      "(p1)",
+      "m3",
+      "m4",
+      "(p2)",
+      "m5",
+    ]);
+  });
+
+  it("still shows photos when the meal schedule has run out", () => {
+    const feed = interleaveFeed([], photos);
+    expect(feed.every((i) => i.kind === "photo")).toBe(true);
+    expect(feed).toHaveLength(3);
+  });
+
+  it("never drops a drawn photo", () => {
+    const feed = interleaveFeed(["m1"], photos);
+    expect(feed.filter((i) => i.kind === "photo")).toHaveLength(3);
+  });
+
+  it("draws between one and three photos", () => {
+    expect(photoDrawCount(0)).toBe(1);
+    expect(photoDrawCount(5)).toBe(2);
+    expect(photoDrawCount(20)).toBe(3);
+  });
+
+  it("draws the same photos for the same seed and different ones otherwise", () => {
+    const pool = Array.from({ length: 20 }, (_, i) => `p${i}`);
+    expect(pickSeeded(pool, 3, "a")).toEqual(pickSeeded(pool, 3, "a"));
+    expect(pickSeeded(pool, 3, "a")).not.toEqual(pickSeeded(pool, 3, "b"));
+  });
+
+  it("draws distinct photos and never more than the pool holds", () => {
+    const pool = ["a", "b", "c"];
+    const drawn = pickSeeded(pool, 10, "seed");
+    expect(new Set(drawn).size).toBe(3);
+    expect(pickSeeded([], 2, "seed")).toEqual([]);
+  });
+
+  it("holds the draw steady for an hour so a 30s refresh doesn't reshuffle", () => {
+    const start = new Date("2026-08-24T14:00:00Z");
+    const later = new Date("2026-08-24T14:30:00Z");
+    const nextHour = new Date("2026-08-24T15:00:00Z");
+    expect(photoDrawSeed(later)).toBe(photoDrawSeed(start));
+    expect(photoDrawSeed(nextHour)).not.toBe(photoDrawSeed(start));
   });
 });
