@@ -1,5 +1,5 @@
 import "../load-env";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { mealAssignments, meals, members, pets } from "@/db/schema";
 import { MEALS, MEMBERS, PETS } from "./data";
@@ -9,7 +9,7 @@ const MEAL_TYPE_ORDER: Record<string, number> = { breakfast: 1, lunch: 2, dinner
 /**
  * Idempotent production seed (spec §26). Re-running must not duplicate
  * members, pets, meals or assignments. Natural keys: member email, pet slug,
- * and meal (date + type + title).
+ * and meal (date + type) — one meal fills a given slot on a given day.
  *
  * Note this never touches shopping, dog events, memories or bringing — those are
  * live user data.
@@ -66,12 +66,22 @@ async function seed() {
         sortOrder: MEAL_TYPE_ORDER[meal.mealType] ?? 0,
       })
       .onConflictDoUpdate({
-        target: [meals.mealDate, meals.mealType, meals.title],
+        target: [meals.mealDate, meals.mealType],
         set: {
+          // The seed is the authored schedule, so it wins — a re-seed puts
+          // back a title someone changed in the app, along with the
+          // description and photo that go with it.
+          title: meal.title,
           displayDescription: meal.displayDescription,
           practicalNotes: meal.practicalNotes ?? null,
           photoPath: meal.photo ?? null,
           sortOrder: MEAL_TYPE_ORDER[meal.mealType] ?? 0,
+          // …and when it does put a title back, the cook's confirmation no
+          // longer applies: they agreed to a different dish. Untouched when
+          // the title already matches, so a routine re-seed doesn't make
+          // everyone confirm again.
+          confirmedAt: sql`case when ${meals.title} is distinct from ${meal.title} then null else ${meals.confirmedAt} end`,
+          confirmedByMemberId: sql`case when ${meals.title} is distinct from ${meal.title} then null else ${meals.confirmedByMemberId} end`,
           updatedAt: new Date(),
         },
       })

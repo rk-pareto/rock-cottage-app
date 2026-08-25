@@ -1,12 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ConfirmedBadge } from "@/components/meals/ConfirmedBadge";
+import { MealConfirmPrompt } from "@/components/meals/MealConfirmPrompt";
 import { Card, EmptyState, SectionLabel } from "@/components/ui/Card";
 import { PlayGlyph } from "@/components/ui/icons";
 import { RelativeTime } from "@/components/ui/RelativeTime";
 import { requireMember } from "@/lib/auth/membership";
 import { getDogStatuses } from "@/lib/dogs";
 import { interleaveFeed, memoryDrawCount, memoryDrawSeed, pickSeeded } from "@/lib/feed";
-import { getUpcomingMeals, type MealRow } from "@/lib/meals";
+import {
+  getMealsAwaitingConfirmation,
+  getUpcomingMeals,
+  type MealRow,
+} from "@/lib/meals";
 import {
   formatDuration,
   getReadyMemories,
@@ -15,7 +21,15 @@ import {
 } from "@/lib/memories";
 import { getOpenShoppingItems } from "@/lib/shopping";
 import { isStorageConfigured } from "@/lib/storage/s3";
-import { cottageToday, formatLongDate, relativeTime } from "@/lib/time";
+import {
+  addDays,
+  cottageToday,
+  formatClock,
+  formatWeekday,
+  formatLongDate,
+  mealStartAt,
+  relativeTime,
+} from "@/lib/time";
 import type { PetEventType } from "@/db/schema";
 
 export const metadata: Metadata = { title: "Rock Cottage" };
@@ -41,8 +55,9 @@ export default async function HomePage() {
   const storageReady = isStorageConfigured();
 
   // Home queries the source tables directly — no activity-feed system (spec §43).
-  const [meals, dogs, shopping, memoryPool] = await Promise.all([
+  const [meals, confirmations, dogs, shopping, memoryPool] = await Promise.all([
     getUpcomingMeals(5),
+    getMealsAwaitingConfirmation(member.id),
     getDogStatuses(),
     getOpenShoppingItems(),
     storageReady ? getReadyMemories(MEMORY_POOL) : Promise.resolve([]),
@@ -62,6 +77,27 @@ export default async function HomePage() {
           Hey {member.displayName}
         </h1>
       </header>
+
+      {/* Above "Coming up" because it's the one thing here that wants an
+          answer rather than a glance. It disappears once given. */}
+      {confirmations.length > 0 ? (
+        <section className="flex flex-col gap-3">
+          <SectionLabel>
+            {confirmations.length > 1 ? "Your meals" : "Your meal"}
+          </SectionLabel>
+          {confirmations.map((meal) => (
+            <MealConfirmPrompt
+              key={meal.id}
+              meal={{
+                id: meal.id,
+                title: meal.title,
+                when: promptWhen(meal, today),
+                sharedWith: coCooks(meal, member.id),
+              }}
+            />
+          ))}
+        </section>
+      ) : null}
 
       <section className="flex flex-col gap-3">
         <SectionLabel href="/meals">Coming up</SectionLabel>
@@ -159,6 +195,29 @@ export default async function HomePage() {
   );
 }
 
+/**
+ * The other people down to cook this meal, so the prompt can say the answer is
+ * shared. `responsible` and `responsibleMemberIds` come off the same sorted
+ * list, so they line up by index.
+ */
+function coCooks(meal: MealRow, memberId: string): string | undefined {
+  const others = meal.responsible.filter((_, i) => meal.responsibleMemberIds[i] !== memberId);
+  return others.length > 0 ? others.join(" & ") : undefined;
+}
+
+/** "Tomorrow · Dinner · 5:00 PM" — formatted here so the phone's own timezone
+ *  never gets a vote in what the prompt says. */
+function promptWhen(meal: MealRow, today: string): string {
+  const day =
+    meal.mealDate === today
+      ? "Today"
+      : meal.mealDate === addDays(today, 1)
+        ? "Tomorrow"
+        : formatWeekday(meal.mealDate);
+  const type = MEAL_LABEL[meal.mealType] ?? meal.mealType;
+  return `${day} · ${type} · ${formatClock(mealStartAt(meal.mealDate, meal.mealType))}`;
+}
+
 function UpcomingMealCard({ meal, today }: { meal: MealRow; today: string }) {
   const isToday = meal.mealDate === today;
   const day = isToday ? "Today" : formatLongDate(meal.mealDate).split(",")[0];
@@ -186,6 +245,12 @@ function UpcomingMealCard({ meal, today }: { meal: MealRow; today: string }) {
           <span className="label text-muted">
             {MEAL_LABEL[meal.mealType] ?? meal.mealType}
           </span>
+          {meal.confirmedAt ? (
+            <>
+              <span aria-hidden="true" className="h-3 w-px bg-line-strong" />
+              <ConfirmedBadge />
+            </>
+          ) : null}
         </p>
         <h3 className="mt-2 font-display text-[1.5rem] leading-tight text-ink">{meal.title}</h3>
         {meal.displayDescription ? (

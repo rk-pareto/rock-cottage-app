@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ConfirmedBadge } from "@/components/meals/ConfirmedBadge";
 import { PageHeader } from "@/components/ui/Card";
 import { getAllMeals, groupByDate, type MealRow } from "@/lib/meals";
 import { requireMember } from "@/lib/auth/membership";
@@ -75,7 +76,10 @@ function MealCard({ meal }: { meal: MealRow }) {
         </div>
       ) : null}
       <div className="p-4">
-        <p className="label text-muted">{TYPE_LABEL[meal.mealType] ?? meal.mealType}</p>
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="label text-muted">{TYPE_LABEL[meal.mealType] ?? meal.mealType}</span>
+          {meal.confirmedAt ? <ConfirmedBadge /> : null}
+        </p>
         <h3 className="mt-2 font-display text-[1.5rem] leading-tight text-ink">{meal.title}</h3>
         {meal.displayDescription ? (
           <p className="mt-2 text-sm leading-relaxed text-muted">{meal.displayDescription}</p>
