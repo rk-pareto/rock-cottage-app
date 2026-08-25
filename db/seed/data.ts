@@ -149,7 +149,7 @@ export const MEALS: SeedMeal[] = [
     title: "Scrambled Eggs with Yogurt & Granola",
     displayDescription:
       "Farm eggs whisked and folded over gentle heat into soft, custardy curds, finished with a drift of aged cheddar. Served with cultured yogurt and a toasted oat cluster.",
-    photo: "meals/egg-bake-yogurt-granola.jpg",
+    photo: "meals/scrambled-eggs-yogurt-granola.jpg",
     practicalNotes:
       "30 eggs · 1½ cups milk · 1 cup shredded cheddar · salt & pepper. Yogurt (2 × 900 g tubs) and granola (oats, almonds, cashews, seeds) on the side. Feeds 5 adults + 3 young kids.",
     responsible: [RYAN],
