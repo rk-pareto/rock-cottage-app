@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { dogsNavLabel, enabledPetSlugs, features, isPetEnabled } from "@/lib/features";
+import {
+  dogsNavLabel,
+  enabledPetSlugs,
+  features,
+  isPetEnabled,
+} from "@/lib/features";
 import {
   addDays,
   cottageToday,
@@ -24,7 +29,14 @@ import {
   memoryDrawCount,
   memoryDrawSeed,
   pickSeeded,
+  withStayEvents,
 } from "@/lib/feed";
+import {
+  ARRIVAL_DATE,
+  DEPARTURE_DATE,
+  formatStayTime,
+  stayEventsFor,
+} from "@/lib/stay";
 
 const original = process.env.FEATURE_JUNO_ENABLED;
 afterEach(() => {
@@ -85,17 +97,27 @@ describe("cottage time", () => {
 
   it("describes recent events in human terms", () => {
     const now = new Date("2026-09-02T20:00:00Z");
-    expect(relativeTime(new Date("2026-09-02T19:59:30Z"), now)).toBe("just now");
-    expect(relativeTime(new Date("2026-09-02T19:13:00Z"), now)).toBe("47 minutes ago");
-    expect(relativeTime(new Date("2026-09-02T17:00:00Z"), now)).toBe("3 hours ago");
-    expect(relativeTime(new Date("2026-09-01T20:00:00Z"), now)).toBe("1 day ago");
+    expect(relativeTime(new Date("2026-09-02T19:59:30Z"), now)).toBe(
+      "just now",
+    );
+    expect(relativeTime(new Date("2026-09-02T19:13:00Z"), now)).toBe(
+      "47 minutes ago",
+    );
+    expect(relativeTime(new Date("2026-09-02T17:00:00Z"), now)).toBe(
+      "3 hours ago",
+    );
+    expect(relativeTime(new Date("2026-09-01T20:00:00Z"), now)).toBe(
+      "1 day ago",
+    );
   });
 
   it("round-trips a datetime-local value through cottage time", () => {
     const instant = new Date("2026-09-03T00:42:00Z");
     const inputValue = toCottageInputValue(instant);
     expect(inputValue).toBe("2026-09-02T20:42");
-    expect(fromCottageInputValue(inputValue).toISOString()).toBe(instant.toISOString());
+    expect(fromCottageInputValue(inputValue).toISOString()).toBe(
+      instant.toISOString(),
+    );
   });
 });
 
@@ -107,20 +129,39 @@ describe("validation", () => {
   });
 
   it("rejects event times absurdly far from now", () => {
-    expect(occurredAtSchema.safeParse(new Date().toISOString()).success).toBe(true);
-    expect(occurredAtSchema.safeParse("1998-01-01T00:00:00Z").success).toBe(false);
+    expect(occurredAtSchema.safeParse(new Date().toISOString()).success).toBe(
+      true,
+    );
+    expect(occurredAtSchema.safeParse("1998-01-01T00:00:00Z").success).toBe(
+      false,
+    );
     expect(occurredAtSchema.safeParse("not a time").success).toBe(false);
   });
 
   it("only accepts photo and video uploads of a sane size", () => {
     const base = { filename: "IMG_1234.HEIC", bytes: 4_000_000 };
-    expect(uploadIntentSchema.safeParse({ ...base, contentType: "image/heic" }).success).toBe(true);
-    expect(uploadIntentSchema.safeParse({ ...base, contentType: "IMAGE/JPEG" }).success).toBe(true);
-    expect(uploadIntentSchema.safeParse({ ...base, contentType: "video/mp4" }).success).toBe(true);
-    expect(uploadIntentSchema.safeParse({ ...base, contentType: "audio/mpeg" }).success).toBe(false);
     expect(
-      uploadIntentSchema.safeParse({ ...base, contentType: "image/jpeg", bytes: 999_000_000 })
+      uploadIntentSchema.safeParse({ ...base, contentType: "image/heic" })
         .success,
+    ).toBe(true);
+    expect(
+      uploadIntentSchema.safeParse({ ...base, contentType: "IMAGE/JPEG" })
+        .success,
+    ).toBe(true);
+    expect(
+      uploadIntentSchema.safeParse({ ...base, contentType: "video/mp4" })
+        .success,
+    ).toBe(true);
+    expect(
+      uploadIntentSchema.safeParse({ ...base, contentType: "audio/mpeg" })
+        .success,
+    ).toBe(false);
+    expect(
+      uploadIntentSchema.safeParse({
+        ...base,
+        contentType: "image/jpeg",
+        bytes: 999_000_000,
+      }).success,
     ).toBe(false);
   });
 });
@@ -164,31 +205,45 @@ describe("meal confirmation", () => {
     expect(mealStartAt("2026-09-01", "breakfast").toISOString()).toBe(
       "2026-09-01T12:00:00.000Z",
     );
-    expect(mealStartAt("2026-09-01", "lunch").toISOString()).toBe("2026-09-01T16:00:00.000Z");
+    expect(mealStartAt("2026-09-01", "lunch").toISOString()).toBe(
+      "2026-09-01T16:00:00.000Z",
+    );
     expect(mealStartAt("2026-09-01", "dinner").toISOString()).toBe(DINNER);
   });
 
   it("holds the serving time across the standard-time boundary", () => {
     // Nov 8 2026 is EST (UTC-5) — same 5:00 PM on the clock, different offset.
-    expect(mealStartAt("2026-11-08", "dinner").toISOString()).toBe("2026-11-08T22:00:00.000Z");
+    expect(mealStartAt("2026-11-08", "dinner").toISOString()).toBe(
+      "2026-11-08T22:00:00.000Z",
+    );
   });
 
   it("has no opinion about a meal type it doesn't know", () => {
-    expect(Number.isNaN(mealStartAt("2026-09-01", "brunch").getTime())).toBe(true);
-    expect(awaitsConfirmation({ ...meal, mealType: "brunch" }, owner, new Date(DINNER))).toBe(
-      false,
+    expect(Number.isNaN(mealStartAt("2026-09-01", "brunch").getTime())).toBe(
+      true,
     );
+    expect(
+      awaitsConfirmation(
+        { ...meal, mealType: "brunch" },
+        owner,
+        new Date(DINNER),
+      ),
+    ).toBe(false);
   });
 
   it("opens the window exactly 22 hours before service", () => {
     const opens = new Date(Date.parse(DINNER) - 22 * 60 * 60 * 1000);
-    expect(awaitsConfirmation(meal, owner, new Date(opens.getTime() - 1000))).toBe(false);
+    expect(
+      awaitsConfirmation(meal, owner, new Date(opens.getTime() - 1000)),
+    ).toBe(false);
     expect(awaitsConfirmation(meal, owner, opens)).toBe(true);
   });
 
   it("closes the window when the food is served", () => {
     const served = new Date(DINNER);
-    expect(awaitsConfirmation(meal, owner, new Date(served.getTime() - 1000))).toBe(true);
+    expect(
+      awaitsConfirmation(meal, owner, new Date(served.getTime() - 1000)),
+    ).toBe(true);
     expect(awaitsConfirmation(meal, owner, served)).toBe(false);
   });
 
@@ -202,15 +257,23 @@ describe("meal confirmation", () => {
   it("stops asking once the meal is answered for", () => {
     const inside = new Date("2026-09-01T12:00:00.000Z");
     expect(awaitsConfirmation(meal, owner, inside)).toBe(true);
-    expect(awaitsConfirmation({ ...meal, confirmedAt: new Date() }, owner, inside)).toBe(false);
+    expect(
+      awaitsConfirmation({ ...meal, confirmedAt: new Date() }, owner, inside),
+    ).toBe(false);
   });
 
   it("only asks the people cooking, and asks nobody when it's everyone's", () => {
     const inside = new Date("2026-09-01T12:00:00.000Z");
     expect(awaitsConfirmation(meal, "member-2", inside)).toBe(false);
-    expect(awaitsConfirmation({ ...meal, responsibleMemberIds: [] }, owner, inside)).toBe(false);
     expect(
-      awaitsConfirmation({ ...meal, responsibleMemberIds: [owner, "member-2"] }, "member-2", inside),
+      awaitsConfirmation({ ...meal, responsibleMemberIds: [] }, owner, inside),
+    ).toBe(false);
+    expect(
+      awaitsConfirmation(
+        { ...meal, responsibleMemberIds: [owner, "member-2"] },
+        "member-2",
+        inside,
+      ),
     ).toBe(true);
   });
 });
@@ -221,15 +284,9 @@ describe("home feed", () => {
 
   it("drops a memory in after every second meal", () => {
     const feed = interleaveFeed(meals, memories.slice(0, 2));
-    expect(feed.map((i) => (i.kind === "meal" ? i.meal : `(${i.memory})`))).toEqual([
-      "m1",
-      "m2",
-      "(p1)",
-      "m3",
-      "m4",
-      "(p2)",
-      "m5",
-    ]);
+    expect(
+      feed.map((i) => (i.kind === "meal" ? i.meal : `(${i.memory})`)),
+    ).toEqual(["m1", "m2", "(p1)", "m3", "m4", "(p2)", "m5"]);
   });
 
   it("still shows memories when the meal schedule has run out", () => {
@@ -271,9 +328,78 @@ describe("home feed", () => {
   });
 });
 
+describe("arrival/departure tiles", () => {
+  const dayMeals = [
+    { mealDate: ARRIVAL_DATE, id: "dinner" },
+    { mealDate: "2026-09-01", id: "breakfast" },
+  ];
+
+  it("only fires on the arrival or departure date itself", () => {
+    expect(stayEventsFor(ARRIVAL_DATE)).toEqual([
+      { kind: "arrival", date: ARRIVAL_DATE, time: "16:00" },
+    ]);
+    expect(stayEventsFor(DEPARTURE_DATE)).toEqual([
+      { kind: "departure", date: DEPARTURE_DATE, time: "10:00" },
+    ]);
+    expect(stayEventsFor("2026-09-01")).toEqual([]);
+  });
+
+  it("phrases arrival and departure times the way Info does", () => {
+    expect(
+      formatStayTime({ kind: "arrival", date: ARRIVAL_DATE, time: "16:00" }),
+    ).toBe("After 4:00 p.m.");
+    expect(
+      formatStayTime({
+        kind: "departure",
+        date: DEPARTURE_DATE,
+        time: "10:00",
+      }),
+    ).toBe("Before 10:00 a.m.");
+  });
+
+  it("places the tile ahead of the first meal on its date", () => {
+    const feed = interleaveFeed(dayMeals, []);
+    const withTile = withStayEvents(feed, stayEventsFor(ARRIVAL_DATE));
+    expect(
+      withTile.map((i) =>
+        i.kind === "meal"
+          ? i.meal.id
+          : i.kind === "stay"
+            ? `(${i.stay.kind})`
+            : "?",
+      ),
+    ).toEqual(["(arrival)", "dinner", "breakfast"]);
+  });
+
+  it("pins the tile to the front when its date has no meal in the feed", () => {
+    const feed = interleaveFeed(
+      [{ mealDate: "2026-09-01", id: "breakfast" }],
+      [],
+    );
+    const withTile = withStayEvents(feed, stayEventsFor(ARRIVAL_DATE));
+    expect(withTile[0]).toEqual({
+      kind: "stay",
+      stay: { kind: "arrival", date: ARRIVAL_DATE, time: "16:00" },
+    });
+  });
+
+  it("leaves the feed untouched on an ordinary day", () => {
+    const feed = interleaveFeed(dayMeals, []);
+    expect(withStayEvents(feed, stayEventsFor("2026-09-01"))).toBe(feed);
+  });
+});
+
 describe("upload intent", () => {
-  const photo = { filename: "IMG_0001.HEIC", contentType: "image/heic", bytes: 4_000_000 };
-  const video = { filename: "IMG_0002.MOV", contentType: "video/quicktime", bytes: 90_000_000 };
+  const photo = {
+    filename: "IMG_0001.HEIC",
+    contentType: "image/heic",
+    bytes: 4_000_000,
+  };
+  const video = {
+    filename: "IMG_0002.MOV",
+    contentType: "video/quicktime",
+    bytes: 90_000_000,
+  };
 
   it("sorts a content type into the kind it belongs to", () => {
     expect(kindForContentType("image/heic")).toBe("image");
@@ -288,21 +414,25 @@ describe("upload intent", () => {
 
   it("rejects anything that is neither", () => {
     expect(
-      uploadIntentSchema.safeParse({ ...photo, contentType: "application/pdf" }).success,
+      uploadIntentSchema.safeParse({ ...photo, contentType: "application/pdf" })
+        .success,
     ).toBe(false);
   });
 
   it("holds videos to their own size limit, not the photo one", () => {
     // A clip larger than any photo may pass; a photo that size may not.
-    expect(uploadIntentSchema.safeParse({ ...video, bytes: MAX_PHOTO_BYTES + 1 }).success).toBe(
-      true,
-    );
-    expect(uploadIntentSchema.safeParse({ ...photo, bytes: MAX_PHOTO_BYTES + 1 }).success).toBe(
-      false,
-    );
-    expect(uploadIntentSchema.safeParse({ ...video, bytes: MAX_VIDEO_BYTES + 1 }).success).toBe(
-      false,
-    );
+    expect(
+      uploadIntentSchema.safeParse({ ...video, bytes: MAX_PHOTO_BYTES + 1 })
+        .success,
+    ).toBe(true);
+    expect(
+      uploadIntentSchema.safeParse({ ...photo, bytes: MAX_PHOTO_BYTES + 1 })
+        .success,
+    ).toBe(false);
+    expect(
+      uploadIntentSchema.safeParse({ ...video, bytes: MAX_VIDEO_BYTES + 1 })
+        .success,
+    ).toBe(false);
   });
 
   it("carries the clip details the browser measured", () => {
@@ -313,6 +443,11 @@ describe("upload intent", () => {
       durationSeconds: 13.6,
       hasPoster: true,
     });
-    expect(parsed).toMatchObject({ width: 1080, height: 1920, durationSeconds: 13.6, hasPoster: true });
+    expect(parsed).toMatchObject({
+      width: 1080,
+      height: 1920,
+      durationSeconds: 13.6,
+      hasPoster: true,
+    });
   });
 });

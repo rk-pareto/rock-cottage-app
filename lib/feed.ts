@@ -7,8 +7,14 @@
  * Pure on purpose: the page fetches the rows, this decides the arrangement.
  */
 
+import type { StayEvent } from "@/lib/stay";
+
 export type FeedItem<M, P> =
   { kind: "meal"; meal: M } | { kind: "memory"; memory: P };
+
+/** A feed item, plus the arrival/departure tile {@link withStayEvents} adds. */
+export type FeedItemWithStay<M, P> =
+  FeedItem<M, P> | { kind: "stay"; stay: StayEvent };
 
 /** xmur3: string → 32-bit seed. */
 function hashSeed(seed: string): number {
@@ -80,5 +86,30 @@ export function interleaveFeed<M, P>(
 
   for (; next < memories.length; next++)
     items.push({ kind: "memory", memory: memories[next] });
+  return items;
+}
+
+/**
+ * Drops arrival/departure tiles into an already-interleaved feed, ahead of
+ * that date's first meal — you learn when you're checking in before you
+ * learn what's for dinner. A day with no meals in the feed still gets its
+ * tile, pinned to the front rather than dropped.
+ */
+export function withStayEvents<M extends { mealDate: string }, P>(
+  feed: FeedItem<M, P>[],
+  events: StayEvent[],
+): FeedItemWithStay<M, P>[] {
+  if (events.length === 0) return feed;
+  const items: FeedItemWithStay<M, P>[] = [...feed];
+  // Furthest-out date first so an earlier insertion doesn't shift the index
+  // an already-placed later one was found at.
+  for (const event of [...events].sort((a, b) =>
+    b.date.localeCompare(a.date),
+  )) {
+    const index = items.findIndex(
+      (item) => item.kind === "meal" && item.meal.mealDate === event.date,
+    );
+    items.splice(index === -1 ? 0 : index, 0, { kind: "stay", stay: event });
+  }
   return items;
 }

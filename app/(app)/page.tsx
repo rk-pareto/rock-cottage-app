@@ -7,7 +7,13 @@ import { PlayGlyph } from "@/components/ui/icons";
 import { RelativeTime } from "@/components/ui/RelativeTime";
 import { requireMember } from "@/lib/auth/membership";
 import { getDogStatuses } from "@/lib/dogs";
-import { interleaveFeed, memoryDrawCount, memoryDrawSeed, pickSeeded } from "@/lib/feed";
+import {
+  interleaveFeed,
+  memoryDrawCount,
+  memoryDrawSeed,
+  pickSeeded,
+  withStayEvents,
+} from "@/lib/feed";
 import {
   getMealsAwaitingConfirmation,
   getUpcomingMeals,
@@ -20,6 +26,7 @@ import {
   type MemoryCard,
 } from "@/lib/memories";
 import { getOpenShoppingItems } from "@/lib/shopping";
+import { formatStayTime, stayEventsFor, type StayEvent } from "@/lib/stay";
 import { isStorageConfigured } from "@/lib/storage/s3";
 import {
   addDays,
@@ -64,10 +71,17 @@ export default async function HomePage() {
   ]);
 
   // Only the drawn memories get presigned URLs — no point signing the pool.
-  const drawn = pickSeeded(memoryPool, memoryDrawCount(meals.length), memoryDrawSeed());
+  const drawn = pickSeeded(
+    memoryPool,
+    memoryDrawCount(meals.length),
+    memoryDrawSeed(),
+  );
   const memories = drawn.length > 0 ? await withThumbnailUrls(drawn) : [];
-  const feed = interleaveFeed(meals, memories);
   const today = cottageToday();
+  const feed = withStayEvents(
+    interleaveFeed(meals, memories),
+    stayEventsFor(today),
+  );
 
   return (
     <div className="flex flex-col gap-8">
@@ -104,14 +118,25 @@ export default async function HomePage() {
 
         {feed.length === 0 ? (
           <Card>
-            <EmptyState>No meals left on the schedule. Leftovers it is.</EmptyState>
+            <EmptyState>
+              No meals left on the schedule. Leftovers it is.
+            </EmptyState>
           </Card>
         ) : (
           feed.map((item) =>
             item.kind === "meal" ? (
-              <UpcomingMealCard key={`meal-${item.meal.id}`} meal={item.meal} today={today} />
+              <UpcomingMealCard
+                key={`meal-${item.meal.id}`}
+                meal={item.meal}
+                today={today}
+              />
+            ) : item.kind === "memory" ? (
+              <MemoryBreak
+                key={`memory-${item.memory.id}`}
+                memory={item.memory}
+              />
             ) : (
-              <MemoryBreak key={`memory-${item.memory.id}`} memory={item.memory} />
+              <StayTile key={`stay-${item.stay.kind}`} stay={item.stay} />
             ),
           )
         )}
@@ -131,7 +156,9 @@ export default async function HomePage() {
                   key={type}
                   className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 border-b border-line py-2.5 last:border-b-0"
                 >
-                  <span className="text-sm font-bold text-ink">{DOG_LABEL[type]}</span>
+                  <span className="text-sm font-bold text-ink">
+                    {DOG_LABEL[type]}
+                  </span>
                   {event ? (
                     <span className="text-sm text-muted">
                       <span className="font-semibold text-ink-soft">
@@ -144,7 +171,9 @@ export default async function HomePage() {
                       {event.recordedBy}
                     </span>
                   ) : (
-                    <span className="text-sm text-muted">Nothing recorded yet</span>
+                    <span className="text-sm text-muted">
+                      Nothing recorded yet
+                    </span>
                   )}
                 </li>
               );
@@ -155,7 +184,9 @@ export default async function HomePage() {
 
       <section className="flex flex-col gap-3">
         <SectionLabel href="/shopping">
-          {shopping.length > 0 ? `Need from town · ${shopping.length}` : "Shopping"}
+          {shopping.length > 0
+            ? `Need from town · ${shopping.length}`
+            : "Shopping"}
         </SectionLabel>
         {shopping.length === 0 ? (
           <EmptyState>Nothing needed from town.</EmptyState>
@@ -166,12 +197,18 @@ export default async function HomePage() {
                 key={item.id}
                 className="flex items-baseline justify-between gap-4 border-b border-line py-2.5 last:border-b-0"
               >
-                <span className="min-w-0 truncate text-sm font-bold text-ink">{item.name}</span>
-                <span className="shrink-0 text-sm text-muted">{item.requestedBy}</span>
+                <span className="min-w-0 truncate text-sm font-bold text-ink">
+                  {item.name}
+                </span>
+                <span className="shrink-0 text-sm text-muted">
+                  {item.requestedBy}
+                </span>
               </li>
             ))}
             {shopping.length > 5 ? (
-              <li className="pt-2.5 text-sm text-muted">+ {shopping.length - 5} more</li>
+              <li className="pt-2.5 text-sm text-muted">
+                + {shopping.length - 5} more
+              </li>
             ) : null}
           </ul>
         )}
@@ -201,7 +238,9 @@ export default async function HomePage() {
  * list, so they line up by index.
  */
 function coCooks(meal: MealRow, memberId: string): string | undefined {
-  const others = meal.responsible.filter((_, i) => meal.responsibleMemberIds[i] !== memberId);
+  const others = meal.responsible.filter(
+    (_, i) => meal.responsibleMemberIds[i] !== memberId,
+  );
   return others.length > 0 ? others.join(" & ") : undefined;
 }
 
@@ -240,7 +279,9 @@ function UpcomingMealCard({ meal, today }: { meal: MealRow; today: string }) {
       ) : null}
       <div className="p-4">
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span className={`label ${isToday ? "text-ink" : "text-muted"}`}>{day}</span>
+          <span className={`label ${isToday ? "text-ink" : "text-muted"}`}>
+            {day}
+          </span>
           <span aria-hidden="true" className="h-3 w-px bg-line-strong" />
           <span className="label text-muted">
             {MEAL_LABEL[meal.mealType] ?? meal.mealType}
@@ -252,7 +293,9 @@ function UpcomingMealCard({ meal, today }: { meal: MealRow; today: string }) {
             </>
           ) : null}
         </p>
-        <h3 className="mt-2 font-display text-[1.5rem] leading-tight text-ink">{meal.title}</h3>
+        <h3 className="mt-2 font-display text-[1.5rem] leading-tight text-ink">
+          {meal.title}
+        </h3>
         {meal.displayDescription ? (
           <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-muted">
             {meal.displayDescription}
@@ -261,8 +304,42 @@ function UpcomingMealCard({ meal, today }: { meal: MealRow; today: string }) {
         <p className="mt-3 border-t border-line pt-2.5 text-sm text-ink-soft">
           <span className="text-muted">Cooking</span>{" "}
           <span className="font-bold text-ink">
-            {meal.responsible.length > 0 ? meal.responsible.join(" & ") : "Everyone"}
+            {meal.responsible.length > 0
+              ? meal.responsible.join(" & ")
+              : "Everyone"}
           </span>
+        </p>
+      </div>
+    </Link>
+  );
+}
+
+/**
+ * The one day this fires for arrival, and the one day it fires for departure
+ * (spec §13.2 has the same two facts as static Info text). Shaped like
+ * {@link MealConfirmPrompt} — rule, label, heading, line — but lake-blue and
+ * unanswerable: there's nothing to do here, only somewhere to be.
+ */
+function StayTile({ stay }: { stay: StayEvent }) {
+  const isArrival = stay.kind === "arrival";
+  return (
+    <Link
+      href="/info/getting-there"
+      className="block overflow-hidden rounded-2xl border border-line bg-card shadow-[0_1px_1px_rgba(14,18,22,0.03)] transition-colors active:bg-subtle"
+    >
+      <div className="border-l-[3px] border-lake p-4">
+        <p className="label text-lake">
+          {isArrival ? "Arrival today" : "Departure today"}
+        </p>
+        <h3 className="mt-2 font-display text-[1.5rem] leading-tight text-ink">
+          {isArrival ? "Welcome to the cottage" : "Safe travels home"}
+        </h3>
+        <p className="mt-1.5 text-sm leading-relaxed text-muted">
+          {isArrival ? "Check-in is" : "Check-out is"}{" "}
+          <span className="font-bold text-ink-soft">
+            {formatStayTime(stay)}
+          </span>
+          .
         </p>
       </div>
     </Link>
@@ -276,7 +353,8 @@ function UpcomingMealCard({ meal, today }: { meal: MealRow; today: string }) {
  * rather than pretending to play here.
  */
 function MemoryBreak({ memory }: { memory: MemoryCard }) {
-  const portrait = memory.width && memory.height ? memory.height > memory.width : false;
+  const portrait =
+    memory.width && memory.height ? memory.height > memory.width : false;
   const duration = formatDuration(memory.durationSeconds);
 
   return (
