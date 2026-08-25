@@ -28,6 +28,7 @@ export type SeedMeal = {
 };
 
 const RYAN = "ryankrook@gmail.com";
+const GREG = "chociejgreg@gmail.com";
 const DANA = "danakrook@gmail.com";
 const SEAN = "sean.hemraj@live.com";
 const DS = [DANA, SEAN];
@@ -204,8 +205,8 @@ export const MEALS: SeedMeal[] = [
       "Wild shrimp seared in a foaming garlic butter until barely opaque, set against chilled buckwheat noodles dressed in toasted sesame and scattered with scallion. A bright, restrained finish to the week.",
     photo: "meals/garlic-shrimp-sesame-soba-noodles.jpg",
     practicalNotes:
-      "Dana & Sean handle this one. Shrimp, garlic, butter, soba noodles, toasted sesame, scallion. Leftovers are the backup if the week has gone sideways.",
-    responsible: DS,
+      "Greg's meal to plan. Shrimp, garlic, butter, soba noodles, toasted sesame, scallion. Leftovers are the backup if the week has gone sideways.",
+    responsible: [GREG],
   },
   {
     mealDate: "2026-09-06",

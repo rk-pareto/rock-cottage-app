@@ -13,10 +13,10 @@
 | **Wed** Sep 2 | Eggs, toast, fruit | Hot dogs + raw veg | **Pulled pork** + burrito-bowl sides + corn on the cob |
 | **Thu** Sep 3 | Waffles, bacon, fruit | Sloppy Joes + coleslaw | Chicken skewers, greek salad, lemon potatoes |
 | **Fri** Sep 4 | **Scrambled eggs** + yogurt & granola | Beef shishkabobs | Burgers, fries, salad |
-| **Sat** Sep 5 | DIY | **Chicken salad** (pre-made, bring) | Garlic shrimp + sesame soba noodles (Dana & Sean) |
+| **Sat** Sep 5 | DIY | **Chicken salad** (pre-made, bring) | Garlic shrimp + sesame soba noodles (Greg) |
 | **Sun** Sep 6 (depart) | DIY | Leftovers | — |
 
-**Who cooks (from spreadsheet):** Dana & Sean cover most dinners + Tue/Wed/Thu breakfasts. Ryan brings chili + pulled pork + sloppy Joes + chicken salad (all pre-made). DIY days = everyone.
+**Who cooks (from spreadsheet):** Dana & Sean cover most dinners + Tue/Wed/Thu breakfasts. Greg takes Sat dinner. Ryan brings chili + pulled pork + chicken salad (pre-made) and makes the sloppy Joes on-site. DIY days = everyone.
 
 ---
 
@@ -115,8 +115,8 @@
 - Chicken salad (make-ahead, bring): ~3 lb cooked chicken, mayo, celery, dill pickles
 - Bread or lettuce to serve on
 
-### Sat — Dinner: Garlic shrimp + sesame soba noodles (Dana & Sean)
-- Garlic shrimp, sesame soba noodles — D&S handle
+### Sat — Dinner: Garlic shrimp + sesame soba noodles (Greg)
+- Garlic shrimp, sesame soba noodles — Greg handles
 - (Backup / leftovers also available)
 
 ### Sun — Leave: Leftovers, DIY breakfast
