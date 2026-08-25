@@ -10,9 +10,9 @@
 |-----|-----------|-------|--------|
 | **Mon** Aug 31 (arrive PM) | — | — | **Chili** (Ryan brings, pre-made) |
 | **Tue** Sep 1 | Pancakes, sausage, fruit | Grilled cheese + veggie sticks | MYO pizza |
-| **Wed** Sep 2 | Eggs, toast, fruit | Hot dogs + raw veg | **Pulled pork** + burrito-bowl sides + coleslaw |
+| **Wed** Sep 2 | Eggs, toast, fruit | Hot dogs + raw veg | **Pulled pork** + burrito-bowl sides + corn on the cob |
 | **Thu** Sep 3 | Waffles, bacon, fruit | Sloppy Joes + coleslaw | Chicken skewers, greek salad, lemon potatoes |
-| **Fri** Sep 4 | **Egg bake** + yogurt & granola | Beef shishkabobs | Burgers, fries, salad |
+| **Fri** Sep 4 | **Scrambled eggs** + yogurt & granola | Beef shishkabobs | Burgers, fries, salad |
 | **Sat** Sep 5 | DIY | **Chicken salad** (pre-made, bring) | Garlic shrimp + sesame soba noodles (Dana & Sean) |
 | **Sun** Sep 6 (depart) | DIY | Leftovers | — |
 
@@ -65,8 +65,8 @@
 - Salsa (1-2 jars)
 - Sour cream (1 tub)
 - Shredded cheese (cheddar, ~1 lb)
-- **Coleslaw** (cabbage) — make on-site; the crunch/veg for this meal
-- Optional: corn, avocado, tortilla chips
+- **Corn on the cob (8-10 ears)** — the veg for this meal
+- Optional: avocado, tortilla chips
 
 ### Thu — Breakfast: Waffles, bacon, fruit · Dana & Sean
 - Waffle mix (or flour/eggs/milk)
@@ -74,9 +74,10 @@
 - Maple syrup
 - Fresh fruit
 
-### Thu — Lunch: Sloppy Joes (pre-made, bring) + coleslaw
-- **Sloppy Joes (pre-made, bring)** — Ryan
-- Coleslaw mix + dressing (make on-site)
+### Thu — Lunch: Sloppy Joes + coleslaw
+- **Sloppy Joes (made on-site from scratch)** — 2 lb ground beef, onion, tomato paste, ketchup, Worcestershire, hamburger buns
+- Coleslaw from **red cabbage + mustard + mayo** (make on-site)
+- Broccoli (side)
 
 ### Thu — Dinner: Chicken skewers, greek salad, lemon potatoes
 - Chicken (boneless thighs/breasts ~3 lb), cut for skewers
@@ -84,16 +85,13 @@
 - Greek salad: tomatoes, cucumber, red onion, olives, feta, olive oil
 - Lemon potatoes (potatoes, lemon, garlic, olive oil)
 
-### Fri — Breakfast: Egg bake + yogurt + granola (Ryan)
-- 10-12 eggs
+### Fri — Breakfast: Scrambled eggs + yogurt + granola (Ryan)
+- 30 eggs
 - 1½ cups milk
-- 1 lb breakfast sausage (or ham)
-- 2 cups shredded cheddar
-- 5-6 slices bread
+- 1 cup shredded cheddar
 - Salt, pepper
-- Optional bell pepper/spinach/green onion
-- Yogurt (large tub)
-- Granola
+- Yogurt (2 × 900 g tubs)
+- Granola (oats, almonds, cashews, seeds)
 
 ### Fri — Lunch: Beef shishkabobs
 - Sirloin/beef cubes (~3 lb)
@@ -114,7 +112,7 @@
 - Whatever's left: eggs, yogurt, granola, fruit, toast
 
 ### Sat — Lunch: Chicken salad (Ryan brings pre-made)
-- Chicken salad (make-ahead, bring): cooked chicken, mayo, celery, grapes
+- Chicken salad (make-ahead, bring): ~3 lb cooked chicken, mayo, celery, dill pickles
 - Bread or lettuce to serve on
 
 ### Sat — Dinner: Garlic shrimp + sesame soba noodles (Dana & Sean)
@@ -125,11 +123,6 @@
 - No planned meals; eat down the fridge
 
 ---
-
-## Ryan's Friday egg-bake recipe
-- **Dish:** 9×13, ~10-12 eggs, assembled the night before.
-- **Ingredients:** 10-12 large eggs · 1½ cups milk · 1 lb / 450 g breakfast sausage (or diced ham) · 2 cups shredded cheddar · 5-6 slices bread torn · ½ tsp salt · pepper · optional bell pepper/spinach/green onion.
-- Serve with yogurt + granola. Feeds 5 adults + 3 young kids.
 
 ## Decisions (resolved Aug 23)
 1. **Sat lunch:** ✅ **Chicken salad** (Ryan chose — pork & beans dropped)

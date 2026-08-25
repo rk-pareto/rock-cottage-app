@@ -28,7 +28,6 @@ export type SeedMeal = {
 };
 
 const RYAN = "ryankrook@gmail.com";
-const GREG = "chociejgreg@gmail.com";
 const DANA = "danakrook@gmail.com";
 const SEAN = "sean.hemraj@live.com";
 const DS = [DANA, SEAN];
@@ -105,10 +104,10 @@ export const MEALS: SeedMeal[] = [
     mealType: "dinner",
     title: "Pulled Pork & Burrito Bowls",
     displayDescription:
-      "Slow-roasted pork shoulder, delicately pulled and lacquered in a smoky-sweet reduction, arranged over steamed long-grain rice and heritage black beans. Accompanied by crisp cabbage dressed in a sharp mustard emulsion.",
+      "Slow-roasted pork shoulder, delicately pulled and lacquered in a smoky-sweet reduction, arranged over steamed long-grain rice and heritage black beans. Accompanied by sweet corn grilled to a charred, buttery finish.",
     photo: "meals/pulled-pork-burrito-bowls.jpg",
     practicalNotes:
-      "Ryan brings the pork shoulder made ahead and frozen. Coleslaw made on-site is the vegetable for this meal. Rice, black beans, salsa, sour cream, cheddar. Optional: corn, avocado, tortilla chips.",
+      "Ryan brings the pork shoulder made ahead and frozen. Corn on the cob (8–10 ears) is the vegetable for this meal. Rice, black beans, salsa, sour cream, cheddar. Optional: avocado, tortilla chips.",
     responsible: [RYAN],
   },
   {
@@ -129,7 +128,7 @@ export const MEALS: SeedMeal[] = [
       "Coarsely ground beef braised in a piquant tomato lacquer with notes of Worcestershire and unrefined sugar, deliberately served in a state of structural collapse. Napkins are provided without judgement.",
     photo: "meals/sloppy-joes-coleslaw.jpg",
     practicalNotes:
-      "Ryan brings the sloppy joe filling made ahead. Hamburger buns, plus coleslaw mix and dressing made on-site.",
+      "Made on-site from scratch: 2 lb ground beef, onion, tomato paste, ketchup, Worcestershire, hamburger buns. Coleslaw from red cabbage, mustard and mayo. Broccoli on the side.",
     responsible: [RYAN],
   },
   {
@@ -146,12 +145,12 @@ export const MEALS: SeedMeal[] = [
   {
     mealDate: "2026-09-04",
     mealType: "breakfast",
-    title: "Egg Bake with Yogurt & Granola",
+    title: "Scrambled Eggs with Yogurt & Granola",
     displayDescription:
-      "A savoury custard of farm egg and whole milk, suspended with torn country bread, aged cheddar and coarse breakfast sausage, rested overnight and baked until it rises with quiet confidence. Served with cultured yogurt and a toasted oat cluster.",
+      "Farm eggs whisked and folded over gentle heat into soft, custardy curds, finished with a drift of aged cheddar. Served with cultured yogurt and a toasted oat cluster.",
     photo: "meals/egg-bake-yogurt-granola.jpg",
     practicalNotes:
-      "Assembled the night before in a 9×13. 10–12 eggs · 1½ cups milk · 1 lb breakfast sausage or diced ham · 2 cups shredded cheddar · 5–6 slices bread, torn · ½ tsp salt · pepper. Optional bell pepper, spinach, green onion. Feeds 5 adults + 3 young kids.",
+      "30 eggs · 1½ cups milk · 1 cup shredded cheddar · salt & pepper. Yogurt (2 × 900 g tubs) and granola (oats, almonds, cashews, seeds) on the side. Feeds 5 adults + 3 young kids.",
     responsible: [RYAN],
   },
   {
@@ -191,10 +190,10 @@ export const MEALS: SeedMeal[] = [
     mealType: "lunch",
     title: "Chicken Salad",
     displayDescription:
-      "Poached chicken hand-torn and bound in a house aioli, punctuated by the vegetal snap of celery and the sudden sweetness of table grape. Presented on soft bread or in a leaf of butter lettuce, per the guest's disposition.",
+      "Poached chicken hand-torn and bound in a house aioli, punctuated by the vegetal snap of celery and the briny bite of dill pickle. Presented on soft bread or in a leaf of butter lettuce, per the guest's disposition.",
     photo: "meals/chicken-salad.jpg",
     practicalNotes:
-      "Ryan brings it made ahead. Cooked chicken, mayo, celery, grapes. Bread or lettuce to serve on.",
+      "Ryan brings it made ahead. ~3 lb cooked chicken, mayo, celery, dill pickles. Bread or lettuce to serve on.",
     responsible: [RYAN],
   },
   {
@@ -205,8 +204,8 @@ export const MEALS: SeedMeal[] = [
       "Wild shrimp seared in a foaming garlic butter until barely opaque, set against chilled buckwheat noodles dressed in toasted sesame and scattered with scallion. A bright, restrained finish to the week.",
     photo: "meals/garlic-shrimp-sesame-soba-noodles.jpg",
     practicalNotes:
-      "Greg's meal to plan. Shrimp, garlic, butter, soba noodles, toasted sesame, scallion. Leftovers are the backup if the week has gone sideways.",
-    responsible: [GREG],
+      "Dana & Sean handle this one. Shrimp, garlic, butter, soba noodles, toasted sesame, scallion. Leftovers are the backup if the week has gone sideways.",
+    responsible: DS,
   },
   {
     mealDate: "2026-09-06",

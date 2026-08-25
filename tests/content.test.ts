@@ -63,11 +63,11 @@ describe("meals", () => {
 
   it("keeps operational notes out of the display description", async () => {
     const meals = await getAllMeals();
-    const eggBake = meals.find((m) => m.title.startsWith("Egg Bake"));
-    expect(eggBake).toBeDefined();
+    const scrambled = meals.find((m) => m.title.startsWith("Scrambled Eggs"));
+    expect(scrambled).toBeDefined();
     // The recipe quantities belong in practical_notes, not the menu prose.
-    expect(eggBake!.displayDescription).not.toMatch(/9×13|1½ cups/);
-    expect(eggBake!.practicalNotes).toMatch(/9×13/);
+    expect(scrambled!.displayDescription).not.toMatch(/30 eggs|1½ cups/);
+    expect(scrambled!.practicalNotes).toMatch(/1½ cups/);
   });
 
   it("only surfaces upcoming days on the home feed", async () => {
