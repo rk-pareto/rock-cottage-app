@@ -14,7 +14,7 @@ same path — no code or database change needed.
 | Pancakes, Sausage & Fruit | `pancakes-sausage-fruit.jpg` | [Pancakes with Berries (Unsplash).jpg](https://commons.wikimedia.org/wiki/File:Pancakes_with_Berries_(Unsplash).jpg) — CC0 |
 | Grilled Cheese & Veggie Sticks | `grilled-cheese-veggie-sticks.jpg` | [Mmm... grilled cheese with dried tomatoes.jpg](https://commons.wikimedia.org/wiki/File:Mmm..._grilled_cheese_with_dried_tomatoes_(5095259698).jpg) — CC BY 2.0 |
 | Make-Your-Own Pizza | `make-your-own-pizza.jpg` | [Homemade Pizza in Bangladesh.jpg](https://commons.wikimedia.org/wiki/File:Homemade_Pizza_in_Bangladesh.jpg) |
-| Eggs, Toast & Fruit | `eggs-toast-fruit.jpg` | [Streaky bacon, fried egg on toast, Cromer (1).JPG](https://commons.wikimedia.org/wiki/File:-2019-07-30_Streaky_bacon,_fried_egg_on_toast,_Cromer_(1).JPG) |
+| Eggs, Toast & Fruit | `eggs-toast-fruit.jpg` | [Breakfastbyasim.jpg](https://commons.wikimedia.org/wiki/File:Breakfastbyasim.jpg) — CC BY 3.0 |
 | Hot Dogs & Raw Veg | `hot-dogs-raw-veg.jpg` | [Honey, chop the relish up a bit more next time.jpg](https://commons.wikimedia.org/wiki/File:Honey%2C_chop_the_relish_up_a_bit_more_next_time._(4962293538).jpg) — CC BY 2.0 |
 | Pulled Pork & Burrito Bowls | `pulled-pork-burrito-bowls.jpg` | [Pulled pork over rice.jpg](https://commons.wikimedia.org/wiki/File:Pulled_pork_over_rice.jpg) — CC BY 3.0 |
 | Waffles, Bacon & Fruit | `waffles-bacon-fruit.jpg` | [Belgian waffles & fruit – Brewhouse & Kitchen.jpg](https://commons.wikimedia.org/wiki/File:Belgian_waffles_%26_fruit_-_Brewhouse_%26_Kitchen_2026-04-14.jpg) — CC0 |
