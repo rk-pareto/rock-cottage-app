@@ -66,6 +66,15 @@ export const meals = pgTable(
     practicalNotes: text("practical_notes"),
     /** Relative path under public/, e.g. "meals/chili.jpg" (spec: meal photos). */
     photoPath: text("photo_path"),
+    /**
+     * Set when the responsible member answers the confirmation prompt — either
+     * by confirming the meal as-is or by renaming it (spec §9.5). Null means
+     * the prompt is still outstanding; it is never cleared once answered.
+     */
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    confirmedByMemberId: uuid("confirmed_by_member_id").references(() => members.id, {
+      onDelete: "restrict",
+    }),
     sortOrder: integer("sort_order").notNull().default(0),
     createdAt,
     updatedAt,
@@ -73,8 +82,11 @@ export const meals = pgTable(
   (t) => [
     index("meals_meal_date_idx").on(t.mealDate),
     index("meals_date_type_idx").on(t.mealDate, t.mealType),
-    // Stable natural key for idempotent seeding (spec §26).
-    uniqueIndex("meals_seed_key_unique").on(t.mealDate, t.mealType, t.title),
+    // Stable natural key for idempotent seeding (spec §26). Deliberately not
+    // including the title: a cook can rename their meal, and a seed key that
+    // moves with the name would re-insert the original rather than update it.
+    // One meal per slot per day is the schedule the house actually runs on.
+    uniqueIndex("meals_seed_key_unique").on(t.mealDate, t.mealType),
   ],
 );
 

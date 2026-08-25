@@ -1,7 +1,16 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { bringingItems, media, pets, petEvents, shoppingItems, type Member } from "@/db/schema";
+import {
+  bringingItems,
+  mealAssignments,
+  meals,
+  media,
+  pets,
+  petEvents,
+  shoppingItems,
+  type Member,
+} from "@/db/schema";
 import { cleanupMembers, createTestMember } from "./helpers";
 
 /**
@@ -30,14 +39,18 @@ const { recordPetEvent, deletePetEvent, updatePetEventTime } = await import(
   "@/app/(app)/dogs/actions"
 );
 const { deleteMemory } = await import("@/app/(app)/memories/actions");
+const { confirmMeal, updateMealTitle } = await import("@/app/(app)/meals/actions");
 const { getOpenShoppingItems } = await import("@/lib/shopping");
 const { getBringingItems } = await import("@/lib/bringing");
 const { getDogStatuses, getRecentEvents } = await import("@/lib/dogs");
+const { getMealsAwaitingConfirmation } = await import("@/lib/meals");
+const { mealStartAt } = await import("@/lib/time");
 
 let alice: Member; // the "owner" in ownership tests
 let bob: Member; // an unrelated normal member
 let admin: Member;
 const createdIds: string[] = [];
+const createdMealIds: string[] = [];
 
 beforeAll(async () => {
   alice = await createTestMember("alice");
@@ -47,8 +60,47 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  for (const id of createdMealIds) {
+    await db.delete(mealAssignments).where(eq(mealAssignments.mealId, id));
+    await db.delete(meals).where(eq(meals.id, id));
+  }
   await cleanupMembers(createdIds);
 });
+
+/**
+ * A meal far enough in the future that no seeded row shares its seed key.
+ * Each one gets its own day, because that key is now (date, type) — two test
+ * meals in the same slot would collide exactly as two real ones would.
+ */
+let nextMealDay = 1;
+async function createTestMeal(
+  owner: Member | Member[] | null,
+  mealDate = `2099-01-${String(nextMealDay++).padStart(2, "0")}`,
+) {
+  const [row] = await db
+    .insert(meals)
+    .values({
+      mealDate,
+      mealType: "dinner",
+      title: `Test Meal ${Math.random().toString(36).slice(2, 10)}`,
+      displayDescription: "A patient braise of nothing in particular.",
+      photoPath: "meals/test.jpg",
+    })
+    .returning();
+  createdMealIds.push(row!.id);
+  const owners = owner ? (Array.isArray(owner) ? owner : [owner]) : [];
+  if (owners.length > 0) {
+    await db
+      .insert(mealAssignments)
+      .values(owners.map((o) => ({ mealId: row!.id, memberId: o.id })));
+  }
+  return row!;
+}
+
+async function readMeal(id: string) {
+  const [row] = await db.select().from(meals).where(eq(meals.id, id)).limit(1);
+  return row!;
+}
 
 describe("authorization", () => {
   it("rejects every mutation when nobody is signed in", async () => {
@@ -346,5 +398,195 @@ describe("memories", () => {
     currentMember = alice;
     expect(await deleteMemory(row!.id)).toEqual({ ok: true });
     expect(await db.select().from(media).where(eq(media.id, row!.id))).toHaveLength(0);
+  });
+});
+
+describe("meal confirmation", () => {
+  it("lets the cook confirm, recording who answered", async () => {
+    const meal = await createTestMeal(alice);
+
+    currentMember = alice;
+    expect(await confirmMeal(meal.id)).toEqual({ ok: true });
+
+    const after = await readMeal(meal.id);
+    expect(after.confirmedAt).toBeInstanceOf(Date);
+    expect(after.confirmedByMemberId).toBe(alice.id);
+    // Confirming changes nothing else about the meal.
+    expect(after.title).toBe(meal.title);
+    expect(after.displayDescription).toBe(meal.displayDescription);
+    expect(after.photoPath).toBe(meal.photoPath);
+  });
+
+  it("refuses a member who isn't cooking it", async () => {
+    const meal = await createTestMeal(alice);
+
+    currentMember = bob;
+    expect(await confirmMeal(meal.id)).toMatchObject({ ok: false });
+    expect(await updateMealTitle(meal.id, "Bob's Idea")).toMatchObject({ ok: false });
+
+    const after = await readMeal(meal.id);
+    expect(after.confirmedAt).toBeNull();
+    expect(after.title).toBe(meal.title);
+  });
+
+  it("refuses a meal nobody is responsible for", async () => {
+    const meal = await createTestMeal(null);
+
+    currentMember = alice;
+    expect(await confirmMeal(meal.id)).toMatchObject({ ok: false });
+  });
+
+  it("lets an admin answer for a meal they aren't cooking", async () => {
+    const meal = await createTestMeal(alice);
+
+    currentMember = admin;
+    expect(await confirmMeal(meal.id)).toEqual({ ok: true });
+    expect((await readMeal(meal.id)).confirmedByMemberId).toBe(admin.id);
+  });
+
+  it("renaming clears the description and photo, and counts as confirming", async () => {
+    const meal = await createTestMeal(alice);
+
+    currentMember = alice;
+    expect(await updateMealTitle(meal.id, "  Tacos  ")).toEqual({ ok: true });
+
+    const after = await readMeal(meal.id);
+    expect(after.title).toBe("Tacos");
+    expect(after.displayDescription).toBeNull();
+    expect(after.photoPath).toBeNull();
+    expect(after.confirmedAt).toBeInstanceOf(Date);
+    expect(after.confirmedByMemberId).toBe(alice.id);
+  });
+
+  it("keeps the description and photo when the name is submitted unchanged", async () => {
+    const meal = await createTestMeal(alice);
+
+    currentMember = alice;
+    expect(await updateMealTitle(meal.id, meal.title)).toEqual({ ok: true });
+
+    const after = await readMeal(meal.id);
+    expect(after.displayDescription).toBe(meal.displayDescription);
+    expect(after.photoPath).toBe(meal.photoPath);
+    expect(after.confirmedAt).toBeInstanceOf(Date);
+  });
+
+  it("rejects an empty name", async () => {
+    const meal = await createTestMeal(alice);
+
+    currentMember = alice;
+    expect(await updateMealTitle(meal.id, "   ")).toMatchObject({ ok: false });
+    expect((await readMeal(meal.id)).title).toBe(meal.title);
+  });
+
+  it("allows a name another meal already uses on a different day", async () => {
+    const other = await createTestMeal(alice);
+    const meal = await createTestMeal(alice);
+
+    currentMember = alice;
+    expect(await updateMealTitle(meal.id, other.title)).toEqual({ ok: true });
+    expect((await readMeal(meal.id)).title).toBe(other.title);
+  });
+
+  it("asks only inside the window, and stops once answered", async () => {
+    const soon = await createTestMeal(alice, "2099-06-01");
+    const later = await createTestMeal(alice, "2099-06-05");
+    // An hour before Jun 1 dinner: that meal's window is open, Jun 5's is not.
+    const now = new Date(mealStartAt("2099-06-01", "dinner").getTime() - 60 * 60 * 1000);
+
+    const before = await getMealsAwaitingConfirmation(alice.id, now);
+    expect(before.map((m) => m.id)).toContain(soon.id);
+    expect(before.map((m) => m.id)).not.toContain(later.id);
+
+    // Nobody else is being asked about it.
+    expect((await getMealsAwaitingConfirmation(bob.id, now)).map((m) => m.id)).not.toContain(
+      soon.id,
+    );
+
+    currentMember = alice;
+    expect(await confirmMeal(soon.id)).toEqual({ ok: true });
+    expect((await getMealsAwaitingConfirmation(alice.id, now)).map((m) => m.id)).not.toContain(
+      soon.id,
+    );
+  });
+
+  it("lets either cook answer for a shared meal, and only the first one counts", async () => {
+    const meal = await createTestMeal([alice, bob]);
+    const now = new Date(mealStartAt(meal.mealDate, "dinner").getTime() - 60 * 60 * 1000);
+
+    // Both are asked.
+    expect((await getMealsAwaitingConfirmation(alice.id, now)).map((m) => m.id)).toContain(meal.id);
+    expect((await getMealsAwaitingConfirmation(bob.id, now)).map((m) => m.id)).toContain(meal.id);
+
+    currentMember = alice;
+    expect(await confirmMeal(meal.id)).toEqual({ ok: true });
+
+    // Neither is asked again, and Bob's late tap doesn't take the meal from her.
+    expect((await getMealsAwaitingConfirmation(bob.id, now)).map((m) => m.id)).not.toContain(
+      meal.id,
+    );
+    currentMember = bob;
+    const late = await confirmMeal(meal.id);
+    expect(late).toMatchObject({ ok: true });
+    expect((late as { note?: string }).note).toMatch(/Test alice/);
+    expect((await readMeal(meal.id)).confirmedByMemberId).toBe(alice.id);
+  });
+
+  it("holds the first answer when the other cook tries to rename after it", async () => {
+    const meal = await createTestMeal([alice, bob]);
+
+    currentMember = alice;
+    expect(await updateMealTitle(meal.id, "Alice's Tacos")).toEqual({ ok: true });
+
+    currentMember = bob;
+    const late = await updateMealTitle(meal.id, "Bob's Burgers");
+    expect((late as { note?: string }).note).toMatch(/Alice's Tacos/);
+
+    const after = await readMeal(meal.id);
+    expect(after.title).toBe("Alice's Tacos");
+    expect(after.confirmedByMemberId).toBe(alice.id);
+  });
+
+  it("treats the same cook tapping twice as one answer, without scolding them", async () => {
+    const meal = await createTestMeal(alice);
+
+    currentMember = alice;
+    expect(await confirmMeal(meal.id)).toEqual({ ok: true });
+    const first = (await readMeal(meal.id)).confirmedAt;
+
+    // A double-press or a stale tile: silent, and it doesn't move the timestamp.
+    expect(await confirmMeal(meal.id)).toEqual({ ok: true });
+    expect((await readMeal(meal.id)).confirmedAt).toEqual(first);
+  });
+
+  it("resolves simultaneous taps to exactly one winner", async () => {
+    const meal = await createTestMeal([alice, bob]);
+
+    // Fire both at once: the conditional write means one lands, one doesn't.
+    const [a, b] = await Promise.all([
+      (async () => {
+        currentMember = alice;
+        return confirmMeal(meal.id);
+      })(),
+      (async () => {
+        currentMember = bob;
+        return confirmMeal(meal.id);
+      })(),
+    ]);
+
+    expect(a).toMatchObject({ ok: true });
+    expect(b).toMatchObject({ ok: true });
+    const winner = (await readMeal(meal.id)).confirmedByMemberId;
+    expect([alice.id, bob.id]).toContain(winner);
+    // Exactly one write took effect; the loser is told, and told once.
+    const notes = [a, b].filter((r) => "note" in r && r.note).length;
+    expect(notes).toBe(1);
+  });
+
+  it("rejects every meal mutation when nobody is signed in", async () => {
+    const meal = await createTestMeal(alice);
+
+    currentMember = null;
+    expect(await confirmMeal(meal.id)).toMatchObject({ ok: false });
+    expect(await updateMealTitle(meal.id, "Anything")).toMatchObject({ ok: false });
   });
 });

@@ -15,8 +15,8 @@ screen.
 
 | Screen | Route | What it does |
 |---|---|---|
-| Home | `/` | Upcoming meals, Alice's status, shopping summary, recent memories |
-| Meals | `/meals` | The whole week, read-only, with deeply pretentious descriptions |
+| Home | `/` | Upcoming meals, your meal confirmations, Alice's status, shopping summary, recent memories |
+| Meals | `/meals` | The whole week with deeply pretentious descriptions; only the cook can rename their own |
 | Alice | `/dogs` | Three big buttons: out, pooped, fed. One tap, recorded under your name |
 | Shopping | `/shopping` | Add something, anyone can mark it picked up |
 | Memories | `/memories` | Everyone's photos and videos; originals preserved exactly |
@@ -46,6 +46,22 @@ Phone ──► Railway (Next.js 16, App Router)
   subscriptions — with five users that's plenty.
 - All times render in `America/Toronto` regardless of where the server or the
   phone thinks it is. Meal dates are SQL `date`; everything else is `timestamptz`.
+- Meals are served at 8:00, 12:00 and 17:00 cottage time (`MEAL_TIMES` in
+  `lib/time`). 22 hours before each one, whoever is cooking gets a tile on Home
+  asking them to confirm it or type a new name — which lands the ask just after
+  the previous day's equivalent meal. Renaming clears the seeded description and
+  photo, since they describe the old dish; regenerating them needs runtime AI,
+  which the app still doesn't have. Saving an edit *is* the confirmation — there
+  is no second step. Confirmed meals carry a badge on Home and `/meals`.
+- Many meals have two cooks, and both get the same prompt. Either may answer and
+  only the first answer counts: the write is conditional on `confirmed_at` still
+  being null, so simultaneous taps resolve to one winner and the other cook is
+  told who got there first.
+- The meal seed key is `(meal_date, meal_type)` — one meal per slot per day. It
+  deliberately excludes the title so a re-seed updates a renamed meal instead of
+  inserting the original alongside it. A re-seed restores the authored title,
+  description and photo, and clears the confirmation when it actually changed
+  the title.
 
 ### Layout
 

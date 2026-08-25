@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readdir } from "node:fs/promises";
 import { getInfoPage, getInfoPages } from "@/lib/info";
 import { getAllMeals, getUpcomingMeals } from "@/lib/meals";
+import { MEALS } from "@/db/seed/data";
 
 describe("cottage info", () => {
   it("renders one page per Markdown file, ordered by frontmatter", async () => {
@@ -43,9 +44,18 @@ describe("meals", () => {
     expect([...keys].sort()).toEqual(keys);
   });
 
+  it("fills exactly one slot per day, which is what the seed key relies on", () => {
+    const slots = MEALS.map((m) => `${m.mealDate} ${m.mealType}`);
+    expect(new Set(slots).size, "two seeded meals share a date and type").toBe(slots.length);
+  });
+
   it("gives every meal a restaurant-style description", async () => {
+    const seededTitles = new Set(MEALS.map((m) => m.title));
     const meals = await getAllMeals();
     for (const meal of meals) {
+      // A meal the cook renamed has had its prose cleared on purpose — the
+      // paragraph described the dish they're no longer making.
+      if (!seededTitles.has(meal.title)) continue;
       expect(meal.displayDescription, `${meal.title} has no description`).toBeTruthy();
       expect(meal.displayDescription!.length).toBeGreaterThan(40);
     }

@@ -10,6 +10,16 @@ export const itemNameSchema = z
   .min(1, "Give it a name")
   .max(200, "That name is too long");
 
+/**
+ * A meal title typed by the person cooking it. Same 200-char column as an item
+ * name, but the prompt it answers is different, so the message is too.
+ */
+export const mealTitleSchema = z
+  .string()
+  .trim()
+  .min(1, "Say what you're making")
+  .max(200, "That's a long name for a meal");
+
 export const petSlugSchema = z.string().trim().min(1).max(40);
 export const petEventTypeSchema = z.enum(PET_EVENT_TYPES);
 

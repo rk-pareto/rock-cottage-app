@@ -1,5 +1,33 @@
 export const APP_TIMEZONE = process.env.APP_TIMEZONE || "America/Toronto";
 
+/**
+ * When each meal is actually served, as cottage wall-clock time. Nothing
+ * enforces these — they exist so the app can reason about "22 hours before
+ * dinner" without anyone typing a time into the schedule.
+ */
+export const MEAL_TIMES: Record<string, string> = {
+  breakfast: "08:00",
+  lunch: "12:00",
+  dinner: "17:00",
+};
+
+/**
+ * The instant a meal is served. Meal dates are calendar dates in cottage time,
+ * so the clock time is interpreted there too — an owner in another timezone
+ * still gets prompted relative to when the food hits the table.
+ * Returns an invalid Date for an unknown meal type; callers treat that as
+ * "no known time" rather than guessing.
+ */
+export function mealStartAt(
+  mealDate: string,
+  mealType: string,
+  tz: string = APP_TIMEZONE,
+): Date {
+  const time = MEAL_TIMES[mealType];
+  if (!time) return new Date(NaN);
+  return fromCottageInputValue(`${mealDate}T${time}`, tz);
+}
+
 /** e.g. "8:42 PM" in cottage time. */
 export function formatClock(date: Date, tz: string = APP_TIMEZONE): string {
   return new Intl.DateTimeFormat("en-CA", {

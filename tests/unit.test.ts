@@ -6,6 +6,7 @@ import {
   formatClock,
   formatWeekday,
   fromCottageInputValue,
+  mealStartAt,
   relativeTime,
   toCottageInputValue,
 } from "@/lib/time";
@@ -17,7 +18,7 @@ import {
   occurredAtSchema,
   uploadIntentSchema,
 } from "@/lib/validation/schemas";
-import { groupByDate, type MealRow } from "@/lib/meals";
+import { awaitsConfirmation, groupByDate, type MealRow } from "@/lib/meals";
 import {
   interleaveFeed,
   memoryDrawCount,
@@ -136,12 +137,81 @@ describe("meal grouping", () => {
       displayDescription: null,
       practicalNotes: null,
       photoPath: null,
+      confirmedAt: null,
       responsible: [],
+      responsibleMemberIds: [],
     })) as MealRow[];
 
     const groups = groupByDate(rows);
     expect(groups.map((g) => g.date)).toEqual(["2026-08-31", "2026-09-01"]);
     expect(groups[1]!.meals.map((m) => m.title)).toEqual(["Pancakes", "Pizza"]);
+  });
+});
+
+describe("meal confirmation", () => {
+  // Sep 1 2026 is EDT (UTC-4), so cottage 5:00 PM is 21:00Z.
+  const DINNER = "2026-09-01T21:00:00.000Z";
+  const owner = "member-1";
+
+  const meal = {
+    mealDate: "2026-09-01",
+    mealType: "dinner",
+    confirmedAt: null as Date | null,
+    responsibleMemberIds: [owner],
+  };
+
+  it("puts each meal at its cottage serving time", () => {
+    expect(mealStartAt("2026-09-01", "breakfast").toISOString()).toBe(
+      "2026-09-01T12:00:00.000Z",
+    );
+    expect(mealStartAt("2026-09-01", "lunch").toISOString()).toBe("2026-09-01T16:00:00.000Z");
+    expect(mealStartAt("2026-09-01", "dinner").toISOString()).toBe(DINNER);
+  });
+
+  it("holds the serving time across the standard-time boundary", () => {
+    // Nov 8 2026 is EST (UTC-5) — same 5:00 PM on the clock, different offset.
+    expect(mealStartAt("2026-11-08", "dinner").toISOString()).toBe("2026-11-08T22:00:00.000Z");
+  });
+
+  it("has no opinion about a meal type it doesn't know", () => {
+    expect(Number.isNaN(mealStartAt("2026-09-01", "brunch").getTime())).toBe(true);
+    expect(awaitsConfirmation({ ...meal, mealType: "brunch" }, owner, new Date(DINNER))).toBe(
+      false,
+    );
+  });
+
+  it("opens the window exactly 22 hours before service", () => {
+    const opens = new Date(Date.parse(DINNER) - 22 * 60 * 60 * 1000);
+    expect(awaitsConfirmation(meal, owner, new Date(opens.getTime() - 1000))).toBe(false);
+    expect(awaitsConfirmation(meal, owner, opens)).toBe(true);
+  });
+
+  it("closes the window when the food is served", () => {
+    const served = new Date(DINNER);
+    expect(awaitsConfirmation(meal, owner, new Date(served.getTime() - 1000))).toBe(true);
+    expect(awaitsConfirmation(meal, owner, served)).toBe(false);
+  });
+
+  it("lands just after the previous day's dinner", () => {
+    // 22 hours before Tuesday 5 PM is Monday 7 PM — the plates are cleared.
+    const opens = new Date(Date.parse(DINNER) - 22 * 60 * 60 * 1000);
+    expect(formatClock(opens)).toBe("7:00 p.m.");
+    expect(opens.toISOString().slice(0, 10)).toBe("2026-08-31");
+  });
+
+  it("stops asking once the meal is answered for", () => {
+    const inside = new Date("2026-09-01T12:00:00.000Z");
+    expect(awaitsConfirmation(meal, owner, inside)).toBe(true);
+    expect(awaitsConfirmation({ ...meal, confirmedAt: new Date() }, owner, inside)).toBe(false);
+  });
+
+  it("only asks the people cooking, and asks nobody when it's everyone's", () => {
+    const inside = new Date("2026-09-01T12:00:00.000Z");
+    expect(awaitsConfirmation(meal, "member-2", inside)).toBe(false);
+    expect(awaitsConfirmation({ ...meal, responsibleMemberIds: [] }, owner, inside)).toBe(false);
+    expect(
+      awaitsConfirmation({ ...meal, responsibleMemberIds: [owner, "member-2"] }, "member-2", inside),
+    ).toBe(true);
   });
 });
 
