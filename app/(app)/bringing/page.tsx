@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/ui/Card";
 import { getBringingItems } from "@/lib/bringing";
 import { BringingClient } from "./BringingClient";
 
-export const metadata: Metadata = { title: "Public Good · Rock Cottage" };
+export const metadata: Metadata = { title: "Public Goods · Rock Cottage" };
 
 export default async function BringingPage() {
   const member = await requireMember();
@@ -13,7 +13,7 @@ export default async function BringingPage() {
   return (
     <>
       <PageHeader
-        title="Public Good"
+        title="Public Goods"
         subtitle="Claim it here so we don&rsquo;t end up with four bottles of mustard."
       />
       <BringingClient

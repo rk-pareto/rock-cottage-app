@@ -21,7 +21,7 @@ export type MealType = (typeof MEAL_TYPES)[number];
 export const PET_EVENT_TYPES = ["outside", "poop", "fed"] as const;
 export type PetEventType = (typeof PET_EVENT_TYPES)[number];
 
-/** Categories for the Public Good list (what everyone's bringing to share).
+/** Categories for the Public Goods list (what everyone's bringing to share).
  *  Fixed on purpose — see `lib/bringingCategories.ts` for labels and the
  *  descriptions shown while picking one. */
 export const BRINGING_CATEGORIES = [

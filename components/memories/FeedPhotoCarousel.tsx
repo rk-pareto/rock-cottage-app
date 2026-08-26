@@ -29,13 +29,13 @@ export function FeedPhotoCarousel({
   return (
     <div className="flex flex-col gap-2.5">
       <p className="label text-muted">From the week</p>
-      <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-[9%] pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:px-[22%]">
         {memories.map((memory) => (
           <button
             key={memory.id}
             type="button"
             onClick={() => open(memory.id)}
-            className="group relative aspect-[4/5] w-[38%] shrink-0 snap-start overflow-hidden rounded-2xl bg-subtle sm:w-[26%]"
+            className="group relative aspect-[4/5] w-[82%] shrink-0 snap-center overflow-hidden rounded-2xl bg-subtle sm:w-[56%]"
           >
             {memory.thumbnailUrl ? (
               /* eslint-disable-next-line @next/next/no-img-element */

@@ -1,7 +1,7 @@
 import { BRINGING_CATEGORIES, type BringingCategory } from "@/db/schema";
 
 /**
- * Labels and descriptions for the Public Good categories. The description is
+ * Labels and descriptions for the Public Goods categories. The description is
  * shown while someone's picking a category, so it has one job: help them
  * tell a shared item apart from something that's really tied to one dish or
  * meal — a dish's ingredients belong with that meal, not here, because

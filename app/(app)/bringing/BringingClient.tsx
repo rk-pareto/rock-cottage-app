@@ -188,7 +188,7 @@ export function BringingClient({
           <span aria-hidden="true" className="text-lg leading-none">
             +
           </span>
-          Add to Public Good
+          Add to Public Goods
         </button>
       )}
 
