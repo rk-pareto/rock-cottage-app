@@ -67,6 +67,14 @@ main {
   animation: page-in 0.26s cubic-bezier(0.22, 0.61, 0.36, 1) both;
 }
 
+/* The brief "recorded" checkmark that replaces a dog action's + badge. */
+@keyframes check-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+}
+
 :where(a, button, input, textarea, select, [tabindex]):focus-visible {
   outline: 2px solid var(--color-pine);
   outline-offset: 2px;

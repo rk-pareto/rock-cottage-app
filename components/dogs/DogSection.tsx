@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { RelativeTime } from "@/components/ui/RelativeTime";
 import { useToast } from "@/components/ui/Toast";
 import { recordPetEvent } from "@/app/(app)/dogs/actions";
@@ -66,6 +66,27 @@ const ACTIONS: {
   },
 ];
 
+// Half a second is plenty of time to register "yep, that logged" without
+// lingering long enough to feel like a status, not a confirmation.
+const CONFIRM_MS = 550;
+
+function CheckIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="h-4 w-4 animate-[check-pop_0.18s_ease-out]"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M5 13l4 4L19 7" />
+    </svg>
+  );
+}
+
 function ActionIcon({ children }: { children: React.ReactNode }) {
   return (
     <svg
@@ -90,6 +111,16 @@ export function DogSection({ slug, name, latest, recent, currentMemberName }: Do
   // Optimistic overlay so a tap feels instant; the server render reconciles it.
   const [optimistic, setOptimistic] = useState<Partial<Record<PetEventType, LatestEvent>>>({});
   const [pendingType, setPendingType] = useState<PetEventType | null>(null);
+  // Which actions are currently showing their brief "recorded" checkmark.
+  const [confirmedTypes, setConfirmedTypes] = useState<Partial<Record<PetEventType, boolean>>>({});
+  const confirmTimeouts = useRef<Partial<Record<PetEventType, ReturnType<typeof setTimeout>>>>({});
+
+  useEffect(() => {
+    const timeouts = confirmTimeouts.current;
+    return () => {
+      Object.values(timeouts).forEach((id) => clearTimeout(id));
+    };
+  }, []);
 
   function handleTap(type: PetEventType) {
     if (pendingType) return; // guards against double-taps
@@ -112,7 +143,19 @@ export function DogSection({ slug, name, latest, recent, currentMemberName }: Do
           return next;
         });
         toast(result.error, "error");
+        return;
       }
+
+      setConfirmedTypes((prev) => ({ ...prev, [type]: true }));
+      const existing = confirmTimeouts.current[type];
+      if (existing) clearTimeout(existing);
+      confirmTimeouts.current[type] = setTimeout(() => {
+        setConfirmedTypes((prev) => {
+          const next = { ...prev };
+          delete next[type];
+          return next;
+        });
+      }, CONFIRM_MS);
     });
   }
 
@@ -149,7 +192,7 @@ export function DogSection({ slug, name, latest, recent, currentMemberName }: Do
                   aria-hidden="true"
                   className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/20 text-lg leading-none"
                 >
-                  +
+                  {confirmedTypes[action.type] ? <CheckIcon /> : "+"}
                 </span>
               </button>
               <p className="flex flex-wrap items-baseline gap-x-2 px-1 text-sm">
