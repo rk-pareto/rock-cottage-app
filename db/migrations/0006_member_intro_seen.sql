@@ -1,0 +1,1 @@
+ALTER TABLE "members" ADD COLUMN "intro_seen_at" timestamp with time zone;

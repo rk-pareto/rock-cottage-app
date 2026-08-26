@@ -59,6 +59,12 @@ export const members = pgTable(
     authUserId: text("auth_user_id"),
     isAdmin: boolean("is_admin").notNull().default(false),
     isActive: boolean("is_active").notNull().default(true),
+    /**
+     * When this member finished (or skipped) the intro tour. Null means they
+     * still get it on their next page load — which is why it lives here and
+     * not in the browser: the tour belongs to the person, not the phone.
+     */
+    introSeenAt: timestamp("intro_seen_at", { withTimezone: true }),
     createdAt,
     updatedAt,
   },

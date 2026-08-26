@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { Fragment } from "react";
 import Link from "next/link";
+import { ReplayIntroRow } from "@/components/intro/ReplayIntroRow";
 import { PageHeader } from "@/components/ui/Card";
 import { requireMember } from "@/lib/auth/membership";
 
@@ -80,25 +82,34 @@ export default async function MorePage() {
       <PageHeader title="More" />
       <ul className="overflow-hidden rounded-2xl border border-line">
         {LINKS.map((link) => (
-          <li key={link.href} className="border-b border-line last:border-b-0">
-            <Link
-              href={link.href}
-              className="tap flex items-center gap-4 bg-card px-4 py-3.5 transition-colors hover:bg-subtle active:bg-subtle"
-            >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-subtle text-ink-soft">
-                {link.icon}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-[0.9375rem] font-extrabold tracking-tight text-ink">
-                  {link.label}
+          <Fragment key={link.href}>
+            <li className="border-b border-line last:border-b-0">
+              <Link
+                href={link.href}
+                className="tap flex items-center gap-4 bg-card px-4 py-3.5 transition-colors hover:bg-subtle active:bg-subtle"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-subtle text-ink-soft">
+                  {link.icon}
                 </span>
-                <span className="block text-sm text-muted">{link.hint}</span>
-              </span>
-              <span aria-hidden="true" className="shrink-0 text-lg text-line-strong">
-                ›
-              </span>
-            </Link>
-          </li>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[0.9375rem] font-extrabold tracking-tight text-ink">
+                    {link.label}
+                  </span>
+                  <span className="block text-sm text-muted">{link.hint}</span>
+                </span>
+                <span aria-hidden="true" className="shrink-0 text-lg text-line-strong">
+                  ›
+                </span>
+              </Link>
+            </li>
+            {/* Sits with Cottage Info — both are "how does this work", and it
+                opens in place rather than navigating, so it isn't a LINK. */}
+            {link.href === "/info" ? (
+              <li className="border-b border-line last:border-b-0">
+                <ReplayIntroRow />
+              </li>
+            ) : null}
+          </Fragment>
         ))}
       </ul>
     </>

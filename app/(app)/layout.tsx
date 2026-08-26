@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { AutoRefresh } from "@/components/AutoRefresh";
+import { IntroTour } from "@/components/intro/IntroTour";
 import { BottomNav } from "@/components/navigation/BottomNav";
 import { SignOutButton } from "@/components/SignOutButton";
 import { getMembership } from "@/lib/auth/membership";
@@ -22,6 +23,8 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       <AutoRefresh />
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 pt-4 pb-28">{children}</main>
       <BottomNav dogsLabel={dogsNavLabel()} />
+      {/* First login only — the tour records itself as seen on the member. */}
+      {membership.member.introSeenAt === null ? <IntroTour dogsLabel={dogsNavLabel()} /> : null}
     </>
   );
 }

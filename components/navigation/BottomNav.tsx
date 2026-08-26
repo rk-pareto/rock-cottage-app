@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-type Item = { href: string; label: string; icon: React.ReactNode };
+/** `tour` is what the intro tour's spotlight looks for — see `IntroTour`. */
+type Item = { href: string; label: string; tour: string; icon: React.ReactNode };
 
 const stroke = {
   fill: "none",
@@ -28,6 +29,7 @@ export function BottomNav({ dogsLabel }: { dogsLabel: string }) {
     {
       href: "/",
       label: "Home",
+      tour: "nav-home",
       icon: (
         <Icon>
           <path d="M3.5 10.5 12 3.5l8.5 7" />
@@ -38,6 +40,7 @@ export function BottomNav({ dogsLabel }: { dogsLabel: string }) {
     {
       href: "/meals",
       label: "Meals",
+      tour: "nav-meals",
       icon: (
         <Icon>
           <path d="M6 3v8a2.5 2.5 0 0 0 5 0V3" />
@@ -49,6 +52,7 @@ export function BottomNav({ dogsLabel }: { dogsLabel: string }) {
     {
       href: "/dogs",
       label: dogsLabel,
+      tour: "nav-dogs",
       icon: (
         <Icon>
           <path d="M5.5 10.5c0-1 .8-1.8 1.8-1.8h9.4c1 0 1.8.8 1.8 1.8v3.9a4.6 4.6 0 0 1-4.6 4.6h-3.8a4.6 4.6 0 0 1-4.6-4.6z" />
@@ -61,6 +65,7 @@ export function BottomNav({ dogsLabel }: { dogsLabel: string }) {
     {
       href: "/memories",
       label: "Memories",
+      tour: "nav-memories",
       // Two stacked frames with a play mark: this tab holds photos and clips,
       // and a camera glyph would only claim half of that.
       icon: (
@@ -74,6 +79,7 @@ export function BottomNav({ dogsLabel }: { dogsLabel: string }) {
     {
       href: "/more",
       label: "More",
+      tour: "nav-more",
       icon: (
         <Icon>
           <circle cx="5.5" cy="12" r="1.3" />
@@ -101,6 +107,7 @@ export function BottomNav({ dogsLabel }: { dogsLabel: string }) {
             <li key={item.href} className="flex-1">
               <Link
                 href={item.href}
+                data-tour={item.tour}
                 aria-current={active ? "page" : undefined}
                 className={`tap relative flex flex-col items-center justify-center gap-1 py-2.5 transition-colors active:bg-subtle ${
                   active ? "text-ink" : "text-muted"

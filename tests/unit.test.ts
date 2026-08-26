@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { introSteps } from "@/lib/intro/steps";
 import {
   dogsNavLabel,
   enabledPetSlugs,
@@ -462,5 +463,47 @@ describe("upload intent", () => {
       durationSeconds: 13.6,
       hasPoster: true,
     });
+  });
+});
+
+describe("intro tour", () => {
+  it("has one card per bottom-nav tab, plus a welcome and Public Goods", () => {
+    const steps = introSteps("Alice");
+    expect(steps.map((s) => s.id)).toEqual([
+      "welcome",
+      "home",
+      "meals",
+      "dogs",
+      "memories",
+      "more",
+      "publicGoods",
+    ]);
+    // Every tab the nav renders gets lit up exactly once.
+    expect(steps.filter((s) => s.target !== null).map((s) => s.target)).toEqual([
+      "nav-home",
+      "nav-meals",
+      "nav-dogs",
+      "nav-memories",
+      "nav-more",
+      // Public Goods has no tab of its own — it points at the one it lives under.
+      "nav-more",
+    ]);
+  });
+
+  it("only the welcome card dims the whole screen", () => {
+    const withoutTarget = introSteps("Alice").filter((s) => s.target === null);
+    expect(withoutTarget.map((s) => s.id)).toEqual(["welcome"]);
+  });
+
+  it("titles the dogs card with whatever the nav tab is called", () => {
+    expect(introSteps("Alice").find((s) => s.id === "dogs")?.title).toBe("Alice");
+    expect(introSteps("Dogs").find((s) => s.id === "dogs")?.title).toBe("Dogs");
+  });
+
+  it("writes a body for every card", () => {
+    for (const step of introSteps("Dogs")) {
+      expect(step.body.length).toBeGreaterThan(0);
+      expect(step.label.length).toBeGreaterThan(0);
+    }
   });
 });
