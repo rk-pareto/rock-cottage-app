@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PET_EVENT_TYPES } from "@/db/schema";
+import { BRINGING_CATEGORIES, PET_EVENT_TYPES } from "@/db/schema";
 
 export const uuidSchema = z.string().uuid();
 
@@ -30,12 +30,7 @@ export const optionalTextSchema = z
   .transform((v) => (v.length === 0 ? null : v))
   .nullable();
 
-export const categorySchema = z
-  .string()
-  .trim()
-  .max(80)
-  .transform((v) => (v.length === 0 ? null : v))
-  .nullable();
+export const categorySchema = z.enum(BRINGING_CATEGORIES);
 
 /** An ISO instant that is a real date and not absurdly far from now. */
 export const occurredAtSchema = z

@@ -1,12 +1,12 @@
 import "server-only";
 import { asc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { bringingItems, members } from "@/db/schema";
+import { bringingItems, members, type BringingCategory } from "@/db/schema";
 
 export type BringingRow = {
   id: string;
   name: string;
-  category: string | null;
+  category: BringingCategory;
   notes: string | null;
   responsibleMemberId: string;
   responsibleBy: string;

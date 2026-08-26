@@ -20,7 +20,7 @@ screen.
 | Alice | `/dogs` | Three big buttons: out, pooped, fed. One tap, recorded under your name |
 | Shopping | `/shopping` | Add something, anyone can mark it picked up |
 | Memories | `/memories` | Everyone's photos and videos; originals preserved exactly |
-| We're Bringing | `/bringing` | Claim the ketchup so we don't end up with four |
+| Public Good | `/bringing` | Claim the ketchup so we don't end up with four |
 | Cottage Info | `/info` | Address, wifi, emergency — Markdown files, not a database |
 | Account | `/account` | Your details and sign out |
 

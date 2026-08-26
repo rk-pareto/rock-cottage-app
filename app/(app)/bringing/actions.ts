@@ -16,7 +16,7 @@ function fail(error: string): ActionResult {
 /** Ownership is always the session member (spec §12.1). */
 export async function addBringingItem(input: {
   name: string;
-  category?: string;
+  category: string;
   notes?: string;
 }): Promise<ActionResult> {
   let member;
@@ -27,10 +27,11 @@ export async function addBringingItem(input: {
   }
 
   const name = itemNameSchema.safeParse(input.name);
-  const category = categorySchema.safeParse(input.category ?? "");
+  const category = categorySchema.safeParse(input.category);
   const notes = optionalTextSchema.safeParse(input.notes ?? "");
   if (!name.success) return fail(name.error.issues[0]?.message ?? "That name isn't valid.");
-  if (!category.success || !notes.success) return fail("That entry isn't valid.");
+  if (!category.success) return fail("Pick a category so people know where to find it.");
+  if (!notes.success) return fail("That entry isn't valid.");
 
   try {
     await db.insert(bringingItems).values({
@@ -77,16 +78,17 @@ async function requireOwnedItem(itemId: string): Promise<OwnedItem> {
 
 export async function updateBringingItem(
   itemId: string,
-  input: { name: string; category?: string; notes?: string },
+  input: { name: string; category: string; notes?: string },
 ): Promise<ActionResult> {
   const owned = await requireOwnedItem(itemId);
   if (owned.error !== undefined) return fail(owned.error);
 
   const name = itemNameSchema.safeParse(input.name);
-  const category = categorySchema.safeParse(input.category ?? "");
+  const category = categorySchema.safeParse(input.category);
   const notes = optionalTextSchema.safeParse(input.notes ?? "");
   if (!name.success) return fail(name.error.issues[0]?.message ?? "That name isn't valid.");
-  if (!category.success || !notes.success) return fail("That entry isn't valid.");
+  if (!category.success) return fail("Pick a category so people know where to find it.");
+  if (!notes.success) return fail("That entry isn't valid.");
 
   try {
     await db

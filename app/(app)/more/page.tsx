@@ -39,7 +39,7 @@ const LINKS = [
   },
   {
     href: "/bringing",
-    label: "We're Bringing",
+    label: "Public Good",
     hint: "Who's got the ketchup",
     icon: (
       <Glyph>

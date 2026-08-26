@@ -106,7 +106,9 @@ describe("authorization", () => {
   it("rejects every mutation when nobody is signed in", async () => {
     currentMember = null;
     expect(await addShoppingItem("milk")).toMatchObject({ ok: false });
-    expect(await addBringingItem({ name: "ketchup" })).toMatchObject({ ok: false });
+    expect(await addBringingItem({ name: "ketchup", category: "cooking" })).toMatchObject({
+      ok: false,
+    });
     expect(await recordPetEvent("alice", "outside")).toMatchObject({ ok: false });
   });
 
@@ -197,19 +199,19 @@ describe("shopping", () => {
 describe("bringing", () => {
   it("makes the current user responsible", async () => {
     currentMember = alice;
-    expect(await addBringingItem({ name: "Test Ketchup", category: "Condiments" })).toEqual({
+    expect(await addBringingItem({ name: "Test Ketchup", category: "cooking" })).toEqual({
       ok: true,
     });
 
     const rows = await getBringingItems();
     const row = rows.find((r) => r.name === "Test Ketchup");
     expect(row!.responsibleMemberId).toBe(alice.id);
-    expect(row!.category).toBe("Condiments");
+    expect(row!.category).toBe("cooking");
   });
 
   it("lets the owner edit and pack, but blocks another member", async () => {
     currentMember = alice;
-    await addBringingItem({ name: "Test Mustard" });
+    await addBringingItem({ name: "Test Mustard", category: "cooking" });
     const [item] = await db
       .select()
       .from(bringingItems)
@@ -217,12 +219,16 @@ describe("bringing", () => {
       .limit(1);
 
     currentMember = bob;
-    expect(await updateBringingItem(item!.id, { name: "Hijacked" })).toMatchObject({ ok: false });
+    expect(
+      await updateBringingItem(item!.id, { name: "Hijacked", category: "cooking" }),
+    ).toMatchObject({ ok: false });
     expect(await setPacked(item!.id, true)).toMatchObject({ ok: false });
     expect(await deleteBringingItem(item!.id)).toMatchObject({ ok: false });
 
     currentMember = alice;
-    expect(await updateBringingItem(item!.id, { name: "Test Dijon" })).toEqual({ ok: true });
+    expect(
+      await updateBringingItem(item!.id, { name: "Test Dijon", category: "cooking" }),
+    ).toEqual({ ok: true });
     expect(await setPacked(item!.id, true)).toEqual({ ok: true });
 
     const [packed] = await db.select().from(bringingItems).where(eq(bringingItems.id, item!.id));

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import { EmptyWell } from "@/components/ui/Card";
 import { Check } from "@/components/ui/icons";
+import { BRINGING_CATEGORIES, BRINGING_CATEGORY_INFO, type BringingCategory } from "@/lib/bringingCategories";
 import {
   addBringingItem,
   deleteBringingItem,
@@ -15,14 +16,12 @@ import {
 export type Row = {
   id: string;
   name: string;
-  category: string | null;
+  category: BringingCategory;
   notes: string | null;
   responsibleMemberId: string;
   responsibleBy: string;
   packed: boolean;
 };
-
-const UNCATEGORIZED = "Everything else";
 
 export function BringingClient({
   rows,
@@ -38,19 +37,18 @@ export function BringingClient({
   const [, startTransition] = useTransition();
   const [showAdd, setShowAdd] = useState(false);
   const [name, setName] = useState("");
-  const [category, setCategory] = useState("");
+  const [category, setCategory] = useState<BringingCategory | "">("");
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
-  const groups = new Map<string, Row[]>();
+  const groups = new Map<BringingCategory, Row[]>();
   for (const row of rows) {
-    const key = row.category?.trim() || UNCATEGORIZED;
-    groups.set(key, [...(groups.get(key) ?? []), row]);
+    groups.set(row.category, [...(groups.get(row.category) ?? []), row]);
   }
-  const sortedGroups = [...groups.entries()].sort(([a], [b]) =>
-    a === UNCATEGORIZED ? 1 : b === UNCATEGORIZED ? -1 : a.localeCompare(b),
+  const sortedGroups = [...groups.entries()].sort(
+    ([a], [b]) => BRINGING_CATEGORIES.indexOf(a) - BRINGING_CATEGORIES.indexOf(b),
   );
 
   const canEdit = (row: Row) => row.responsibleMemberId === currentMemberId || isAdmin;
@@ -65,7 +63,7 @@ export function BringingClient({
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
-    if (busy || name.trim().length === 0) return;
+    if (busy || name.trim().length === 0 || category === "") return;
     setBusy(true);
     const payload = { name, category, notes };
 
@@ -87,7 +85,7 @@ export function BringingClient({
   function beginEdit(row: Row) {
     setEditingId(row.id);
     setName(row.name);
-    setCategory(row.category ?? "");
+    setCategory(row.category);
     setNotes(row.notes ?? "");
     setShowAdd(true);
   }
@@ -129,13 +127,34 @@ export function BringingClient({
             maxLength={200}
             className="tap rounded-xl border border-line bg-paper px-4 py-3 text-base text-ink outline-none transition-colors placeholder:text-muted focus:border-ink"
           />
-          <input
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            placeholder="Category (optional) — Condiments, Cooking…"
-            maxLength={80}
-            className="tap rounded-xl border border-line bg-paper px-4 py-3 text-base text-ink outline-none transition-colors placeholder:text-muted focus:border-ink"
-          />
+          <div className="flex flex-col gap-1.5 px-0.5">
+            <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Category">
+              {BRINGING_CATEGORIES.map((value) => {
+                const selected = category === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    onClick={() => setCategory(value)}
+                    className={`tap rounded-full border px-3 py-1.5 text-xs font-bold transition-colors ${
+                      selected
+                        ? "border-ink bg-ink text-paper"
+                        : "border-line text-ink-soft active:bg-subtle"
+                    }`}
+                  >
+                    {BRINGING_CATEGORY_INFO[value].label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="min-h-8 text-xs text-muted">
+              {category
+                ? BRINGING_CATEGORY_INFO[category].description
+                : "Pick where this belongs, so people can see it's the right spot."}
+            </p>
+          </div>
           <input
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
@@ -146,7 +165,7 @@ export function BringingClient({
           <div className="mt-1 flex gap-2">
             <button
               type="submit"
-              disabled={busy || name.trim().length === 0}
+              disabled={busy || name.trim().length === 0 || category === ""}
               className="tap flex-1 rounded-xl bg-ink px-4 py-3 text-[0.9375rem] font-extrabold tracking-tight text-paper transition active:scale-[0.99] disabled:opacity-30"
             >
               {busy ? "Saving…" : editingId ? "Save" : "Add"}
@@ -169,7 +188,7 @@ export function BringingClient({
           <span aria-hidden="true" className="text-lg leading-none">
             +
           </span>
-          Add something I&apos;m bringing
+          Add to Public Good
         </button>
       )}
 
@@ -179,10 +198,12 @@ export function BringingClient({
         </EmptyWell>
       ) : (
         <div className="flex flex-col gap-7">
-          {sortedGroups.map(([groupName, items]) => (
-            <section key={groupName}>
+          {sortedGroups.map(([groupCategory, items]) => (
+            <section key={groupCategory}>
               <div className="mb-2.5 flex items-center gap-3">
-                <h2 className="label shrink-0 text-muted">{groupName}</h2>
+                <h2 className="label shrink-0 text-muted">
+                  {BRINGING_CATEGORY_INFO[groupCategory].label}
+                </h2>
                 <span aria-hidden="true" className="h-px flex-1 bg-line" />
                 <span className="shrink-0 text-xs font-bold text-muted">{items.length}</span>
               </div>

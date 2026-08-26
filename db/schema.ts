@@ -21,6 +21,19 @@ export type MealType = (typeof MEAL_TYPES)[number];
 export const PET_EVENT_TYPES = ["outside", "poop", "fed"] as const;
 export type PetEventType = (typeof PET_EVENT_TYPES)[number];
 
+/** Categories for the Public Good list (what everyone's bringing to share).
+ *  Fixed on purpose — see `lib/bringingCategories.ts` for labels and the
+ *  descriptions shown while picking one. */
+export const BRINGING_CATEGORIES = [
+  "cooking",
+  "toys_games",
+  "drinks",
+  "recreation",
+  "household",
+  "other",
+] as const;
+export type BringingCategory = (typeof BRINGING_CATEGORIES)[number];
+
 /** Memory processing states (spec §14.8). */
 export const PROCESSING_STATES = ["pending", "processing", "ready", "failed"] as const;
 export type ProcessingState = (typeof PROCESSING_STATES)[number];
@@ -160,7 +173,7 @@ export const bringingItems = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     name: varchar("name", { length: 200 }).notNull(),
-    category: varchar("category", { length: 80 }),
+    category: varchar("category", { length: 20 }).notNull().$type<BringingCategory>(),
     notes: text("notes"),
     responsibleMemberId: uuid("responsible_member_id")
       .notNull()
