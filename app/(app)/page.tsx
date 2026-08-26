@@ -3,8 +3,9 @@ import Link from "next/link";
 import { ConfirmedBadge } from "@/components/meals/ConfirmedBadge";
 import { MealConfirmPrompt } from "@/components/meals/MealConfirmPrompt";
 import { Card, EmptyState, SectionLabel } from "@/components/ui/Card";
-import { PlayGlyph } from "@/components/ui/icons";
 import { RelativeTime } from "@/components/ui/RelativeTime";
+import { FeedLightboxProvider, type FeedLightboxItem } from "@/components/memories/FeedLightbox";
+import { FeedPhotoTile } from "@/components/memories/FeedPhotoTile";
 import { requireMember } from "@/lib/auth/membership";
 import { getDogStatuses } from "@/lib/dogs";
 import {
@@ -19,12 +20,7 @@ import {
   getUpcomingMeals,
   type MealRow,
 } from "@/lib/meals";
-import {
-  formatDuration,
-  getReadyMemories,
-  withThumbnailUrls,
-  type MemoryCard,
-} from "@/lib/memories";
+import { formatDuration, getReadyMemories, withThumbnailUrls } from "@/lib/memories";
 import { getOpenShoppingItems } from "@/lib/shopping";
 import { formatStayTime, stayEventsFor, type StayEvent } from "@/lib/stay";
 import { isStorageConfigured } from "@/lib/storage/s3";
@@ -82,6 +78,14 @@ export default async function HomePage() {
     interleaveFeed(meals, memories),
     stayEventsFor(today),
   );
+  // The set a tap on any feed photo can swipe through — same order they
+  // appear in, since `interleaveFeed` never reorders `memories` itself.
+  const feedLightboxItems: FeedLightboxItem[] = memories.map((memory) => ({
+    id: memory.id,
+    kind: memory.kind,
+    uploadedBy: memory.uploadedBy,
+    thumbnailUrl: memory.thumbnailUrl,
+  }));
 
   return (
     <div className="flex flex-col gap-8">
@@ -123,22 +127,33 @@ export default async function HomePage() {
             </EmptyState>
           </Card>
         ) : (
-          feed.map((item) =>
-            item.kind === "meal" ? (
-              <UpcomingMealCard
-                key={`meal-${item.meal.id}`}
-                meal={item.meal}
-                today={today}
-              />
-            ) : item.kind === "memory" ? (
-              <MemoryBreak
-                key={`memory-${item.memory.id}`}
-                memory={item.memory}
-              />
-            ) : (
-              <StayTile key={`stay-${item.stay.kind}`} stay={item.stay} />
-            ),
-          )
+          <FeedLightboxProvider items={feedLightboxItems}>
+            {feed.map((item) =>
+              item.kind === "meal" ? (
+                <UpcomingMealCard
+                  key={`meal-${item.meal.id}`}
+                  meal={item.meal}
+                  today={today}
+                />
+              ) : item.kind === "memory" ? (
+                <FeedPhotoTile
+                  key={`memory-${item.memory.id}`}
+                  memory={{
+                    id: item.memory.id,
+                    kind: item.memory.kind,
+                    uploadedBy: item.memory.uploadedBy,
+                    thumbnailUrl: item.memory.thumbnailUrl,
+                    width: item.memory.width,
+                    height: item.memory.height,
+                    durationLabel: formatDuration(item.memory.durationSeconds),
+                    createdAt: item.memory.createdAt.toISOString(),
+                  }}
+                />
+              ) : (
+                <StayTile key={`stay-${item.stay.kind}`} stay={item.stay} />
+              ),
+            )}
+          </FeedLightboxProvider>
         )}
       </section>
 
@@ -346,49 +361,3 @@ function StayTile({ stay }: { stay: StayEvent }) {
   );
 }
 
-/**
- * A memory dropped between meals. Deliberately shaped unlike a meal card: the
- * picture is from earlier in the week and has nothing to do with the meal
- * above it. Tapping it lands on the gallery, so a clip is marked as a clip
- * rather than pretending to play here.
- */
-function MemoryBreak({ memory }: { memory: MemoryCard }) {
-  const portrait =
-    memory.width && memory.height ? memory.height > memory.width : false;
-  const duration = formatDuration(memory.durationSeconds);
-
-  return (
-    <Link href="/memories" className="group block overflow-hidden rounded-2xl">
-      <div
-        className={`relative w-full overflow-hidden rounded-2xl bg-subtle ${portrait ? "aspect-[4/5]" : "aspect-[4/3]"}`}
-      >
-        {memory.thumbnailUrl ? (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            src={memory.thumbnailUrl}
-            alt={`Added by ${memory.uploadedBy}`}
-            loading="lazy"
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
-          />
-        ) : null}
-        {memory.kind === "video" ? (
-          <span className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded-lg bg-ink/70 px-2 py-1 text-[11px] font-bold text-white backdrop-blur-sm">
-            <PlayGlyph className="h-3 w-3" />
-            {duration ?? "Video"}
-          </span>
-        ) : null}
-      </div>
-      <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 pt-2 text-xs">
-        <span className="label text-muted">From the week</span>
-        <span className="text-muted">
-          {memory.uploadedBy}
-          {" · "}
-          <RelativeTime
-            iso={memory.createdAt.toISOString()}
-            initial={relativeTime(memory.createdAt)}
-          />
-        </span>
-      </p>
-    </Link>
-  );
-}

@@ -24,6 +24,24 @@ export function PlayGlyph({ className = "" }: { className?: string }) {
   );
 }
 
+/** Points left by default; rotate 180° for a "next" arrow. */
+export function ChevronGlyph({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2.2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M15 5.5 8 12l7 6.5" />
+    </svg>
+  );
+}
+
 /** Outline by default; fills solid when a memory is favorited. */
 export function HeartGlyph({
   filled = false,

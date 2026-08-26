@@ -1,10 +1,20 @@
 "use client";
 
-import { useCallback, useRef, useState, useSyncExternalStore, useTransition } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  useTransition,
+} from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import { deleteMemory, toggleFavorite } from "./actions";
-import { HeartGlyph, PlayGlyph } from "@/components/ui/icons";
+import { ChevronGlyph, HeartGlyph, PlayGlyph } from "@/components/ui/icons";
+
+/** Below this drag distance, a touch is a tap or an aborted swipe, not a page turn. */
+const SWIPE_THRESHOLD_PX = 50;
 
 export type MemoryCardData = {
   id: string;
@@ -60,6 +70,11 @@ export function MemoriesClient({
   // `favorited` once a memory has no override — never guessed at.
   const [favoriteOverrides, setFavoriteOverrides] = useState<Record<string, boolean>>({});
   const sharePrefetch = useRef<{ id: string; file: Promise<File> } | null>(null);
+  // Live drag offset while a finger is down, so the photo tracks it before a
+  // swipe commits or springs back.
+  const [dragX, setDragX] = useState(0);
+  const [isTouching, setIsTouching] = useState(false);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
   // False during SSR, so the button appears only once hydration has asked the
   // browser — no markup mismatch.
   const canShareFiles = useSyncExternalStore(subscribeNever, supportsFileSharing, () => false);
@@ -172,8 +187,9 @@ export function MemoriesClient({
     return file;
   }, []);
 
-  function openLightbox(memory: MemoryCardData) {
+  function showMemory(memory: MemoryCardData) {
     setLightboxId(memory.id);
+    setConfirmingId(null);
     // Only prefetch a still: pulling a whole clip down for a share nobody
     // asked for would burn the phone's data on every tap.
     if (canShareFiles && memory.shareable && memory.kind === "image") {
@@ -249,10 +265,66 @@ export function MemoriesClient({
   }
 
   const activeUploads = uploads.filter((u) => u.stage !== "done");
-  const lightboxMemory = memories.find((m) => m.id === lightboxId) ?? null;
   const canDelete = (memory: MemoryCardData) =>
     memory.uploadedByMemberId === currentMemberId || isAdmin;
   const visibleMemories = tab === "favorites" ? memories.filter(isFavorited) : memories;
+  // Swiping walks whatever's currently on screen, so it stays in step with
+  // the All/Favorites tab rather than jumping into memories the grid hid.
+  const lightboxIndex = visibleMemories.findIndex((m) => m.id === lightboxId);
+  const lightboxMemory = lightboxIndex >= 0 ? visibleMemories[lightboxIndex] : null;
+  const hasPrev = lightboxIndex > 0;
+  const hasNext = lightboxIndex >= 0 && lightboxIndex < visibleMemories.length - 1;
+
+  function goPrev() {
+    if (lightboxIndex > 0) showMemory(visibleMemories[lightboxIndex - 1]);
+  }
+  function goNext() {
+    if (hasNext) showMemory(visibleMemories[lightboxIndex + 1]);
+  }
+
+  // Arrow keys mirror the swipe for anyone on a trackpad or keyboard.
+  useEffect(() => {
+    if (!lightboxMemory) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "ArrowLeft") goPrev();
+      else if (event.key === "ArrowRight") goNext();
+      else if (event.key === "Escape") setLightboxId(null);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+    // goPrev/goNext close over lightboxIndex fresh every render, so they're
+    // deliberately left out here — re-subscribing on every keystroke's worth
+    // of state change is fine for a listener this cheap.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lightboxMemory]);
+
+  function onTouchStart(event: React.TouchEvent) {
+    if (event.touches.length !== 1) return;
+    const touch = event.touches[0];
+    touchStart.current = { x: touch.clientX, y: touch.clientY };
+    setIsTouching(true);
+  }
+
+  function onTouchMove(event: React.TouchEvent) {
+    if (!touchStart.current) return;
+    const touch = event.touches[0];
+    const dx = touch.clientX - touchStart.current.x;
+    const dy = touch.clientY - touchStart.current.y;
+    if (Math.abs(dy) > Math.abs(dx)) return; // a vertical drag isn't a page turn
+    // Rubber-band at the ends of the list instead of dragging past them.
+    const pastEnd = (dx < 0 && !hasNext) || (dx > 0 && !hasPrev);
+    setDragX(pastEnd ? dx / 3 : dx);
+  }
+
+  function onTouchEnd() {
+    const dx = dragX;
+    touchStart.current = null;
+    setIsTouching(false);
+    setDragX(0);
+    if (Math.abs(dx) < SWIPE_THRESHOLD_PX) return;
+    if (dx < 0) goNext();
+    else goPrev();
+  }
 
   return (
     <>
@@ -345,7 +417,7 @@ export function MemoriesClient({
                 <>
                   <button
                     type="button"
-                    onClick={() => openLightbox(memory)}
+                    onClick={() => showMemory(memory)}
                     className="group relative h-full w-full overflow-hidden rounded-lg bg-subtle"
                   >
                     {memory.thumbnailUrl ? (
@@ -431,29 +503,68 @@ export function MemoriesClient({
             </div>
           </div>
 
-          <div className="flex flex-1 items-center justify-center overflow-hidden p-2">
-            {lightboxMemory.kind === "video" ? (
-              <video
-                key={lightboxMemory.id}
-                src={`/api/memories/${lightboxMemory.id}/view`}
-                poster={
-                  lightboxMemory.thumbnailUrl
-                    ? `/api/memories/${lightboxMemory.id}/view?variant=poster`
-                    : undefined
-                }
-                controls
-                playsInline
-                preload="metadata"
-                className="max-h-full max-w-full object-contain"
-              />
-            ) : (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img
-                src={`/api/memories/${lightboxMemory.id}/view`}
-                alt={`Added by ${lightboxMemory.uploadedBy}`}
-                className="max-h-full max-w-full object-contain"
-              />
-            )}
+          <div
+            className={`relative flex flex-1 items-center justify-center overflow-hidden p-2 ${
+              lightboxMemory.kind === "image" ? "touch-none" : ""
+            }`}
+            // A video has its own left-right gesture — scrubbing — so only a
+            // photo hands its touches to the swipe.
+            onTouchStart={lightboxMemory.kind === "image" ? onTouchStart : undefined}
+            onTouchMove={lightboxMemory.kind === "image" ? onTouchMove : undefined}
+            onTouchEnd={lightboxMemory.kind === "image" ? onTouchEnd : undefined}
+          >
+            <div
+              style={{
+                transform: `translateX(${dragX}px)`,
+                transition: isTouching ? "none" : "transform 200ms ease",
+              }}
+              className="flex h-full w-full items-center justify-center"
+            >
+              {lightboxMemory.kind === "video" ? (
+                <video
+                  key={lightboxMemory.id}
+                  src={`/api/memories/${lightboxMemory.id}/view`}
+                  poster={
+                    lightboxMemory.thumbnailUrl
+                      ? `/api/memories/${lightboxMemory.id}/view?variant=poster`
+                      : undefined
+                  }
+                  controls
+                  playsInline
+                  preload="metadata"
+                  className="max-h-full max-w-full object-contain"
+                />
+              ) : (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={`/api/memories/${lightboxMemory.id}/view`}
+                  alt={`Added by ${lightboxMemory.uploadedBy}`}
+                  className="max-h-full max-w-full object-contain"
+                  draggable={false}
+                />
+              )}
+            </div>
+
+            {hasPrev ? (
+              <button
+                type="button"
+                onClick={goPrev}
+                aria-label="Previous"
+                className="tap absolute left-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-ink/50 text-white backdrop-blur-sm transition-colors hover:bg-ink/70"
+              >
+                <ChevronGlyph className="h-5 w-5" />
+              </button>
+            ) : null}
+            {hasNext ? (
+              <button
+                type="button"
+                onClick={goNext}
+                aria-label="Next"
+                className="tap absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-ink/50 text-white backdrop-blur-sm transition-colors hover:bg-ink/70"
+              >
+                <ChevronGlyph className="h-5 w-5 rotate-180" />
+              </button>
+            ) : null}
           </div>
 
           <div className="flex flex-wrap gap-2 p-3 safe-bottom">
