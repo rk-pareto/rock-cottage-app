@@ -1,6 +1,6 @@
 /**
  * Home-feed assembly (spec §8.1). Meals are the spine of the feed; memories
- * are dropped in between them as a random selection, not a timeline — the
+ * ride along as a single carousel — a random selection, not a timeline — the
  * meals look forward and the memories look back, so they're deliberately
  * unrelated.
  *
@@ -10,7 +10,8 @@
 import type { StayEvent } from "@/lib/stay";
 
 export type FeedItem<M, P> =
-  { kind: "meal"; meal: M } | { kind: "memory"; memory: P };
+  | { kind: "meal"; meal: M }
+  | { kind: "memoryCarousel"; memories: P[] };
 
 /** A feed item, plus the arrival/departure tile {@link withStayEvents} adds. */
 export type FeedItemWithStay<M, P> =
@@ -59,33 +60,34 @@ export function memoryDrawSeed(now: Date = new Date()): string {
   return String(Math.floor(now.getTime() / 3_600_000));
 }
 
-/** How many memories to weave into a feed carrying `mealCount` meals. */
-export function memoryDrawCount(mealCount: number, every = 2): number {
-  return Math.min(3, Math.max(1, Math.floor(mealCount / every)));
+/**
+ * How many memories to draw for the carousel — 5 to 10, seeded so the count
+ * (like the draw itself) holds steady for the hour, capped by how many are
+ * actually available.
+ */
+export function memoryDrawCount(poolSize: number, seed: string): number {
+  if (poolSize <= 0) return 0;
+  const count = 5 + Math.floor(seededRandom(`${seed}:count`)() * 6); // 5..10
+  return Math.min(count, poolSize);
 }
 
 /**
- * Deal memories into the meal stack — one after every `every` meals, so no
- * card sits alone and the feed keeps a rhythm. Leftover memories (a short
- * meal schedule, or none at all) go on the end rather than being dropped.
+ * Drops the memory carousel into the meal stack after the second meal — far
+ * enough in that it doesn't compete with "Coming up", not so far that it's
+ * buried. A short meal schedule (or none at all) still gets the carousel,
+ * pinned to the front rather than dropped.
  */
 export function interleaveFeed<M, P>(
   meals: M[],
   memories: P[],
-  every = 2,
+  after = 2,
 ): FeedItem<M, P>[] {
-  const items: FeedItem<M, P>[] = [];
-  let next = 0;
-
-  meals.forEach((meal, index) => {
-    items.push({ kind: "meal", meal });
-    if ((index + 1) % every === 0 && next < memories.length) {
-      items.push({ kind: "memory", memory: memories[next++] });
-    }
+  const items: FeedItem<M, P>[] = meals.map((meal) => ({ kind: "meal", meal }));
+  if (memories.length === 0) return items;
+  items.splice(Math.min(after, items.length), 0, {
+    kind: "memoryCarousel",
+    memories,
   });
-
-  for (; next < memories.length; next++)
-    items.push({ kind: "memory", memory: memories[next] });
   return items;
 }
 

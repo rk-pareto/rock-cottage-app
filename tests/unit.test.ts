@@ -282,28 +282,41 @@ describe("home feed", () => {
   const meals = ["m1", "m2", "m3", "m4", "m5"];
   const memories = ["p1", "p2", "p3"];
 
-  it("drops a memory in after every second meal", () => {
-    const feed = interleaveFeed(meals, memories.slice(0, 2));
+  it("drops the memory carousel in after the second meal", () => {
+    const feed = interleaveFeed(meals, memories);
     expect(
-      feed.map((i) => (i.kind === "meal" ? i.meal : `(${i.memory})`)),
-    ).toEqual(["m1", "m2", "(p1)", "m3", "m4", "(p2)", "m5"]);
+      feed.map((i) =>
+        i.kind === "meal" ? i.meal : `(${i.memories.join(",")})`,
+      ),
+    ).toEqual(["m1", "m2", "(p1,p2,p3)", "m3", "m4", "m5"]);
   });
 
-  it("still shows memories when the meal schedule has run out", () => {
+  it("still shows the carousel when the meal schedule has run out", () => {
     const feed = interleaveFeed([], memories);
-    expect(feed.every((i) => i.kind === "memory")).toBe(true);
-    expect(feed).toHaveLength(3);
+    expect(feed).toEqual([{ kind: "memoryCarousel", memories }]);
   });
 
-  it("never drops a drawn memory", () => {
+  it("pins the carousel to the front of a single-meal feed", () => {
     const feed = interleaveFeed(["m1"], memories);
-    expect(feed.filter((i) => i.kind === "memory")).toHaveLength(3);
+    expect(
+      feed.map((i) => (i.kind === "meal" ? i.meal : "(carousel)")),
+    ).toEqual(["m1", "(carousel)"]);
   });
 
-  it("draws between one and three memories", () => {
-    expect(memoryDrawCount(0)).toBe(1);
-    expect(memoryDrawCount(5)).toBe(2);
-    expect(memoryDrawCount(20)).toBe(3);
+  it("skips the carousel entirely when there are no memories to draw", () => {
+    const feed = interleaveFeed(meals, []);
+    expect(feed.every((i) => i.kind === "meal")).toBe(true);
+    expect(feed).toHaveLength(5);
+  });
+
+  it("draws between five and ten memories, never more than the pool holds", () => {
+    for (let i = 0; i < 20; i++) {
+      const seed = `seed-${i}`;
+      expect(memoryDrawCount(60, seed)).toBeGreaterThanOrEqual(5);
+      expect(memoryDrawCount(60, seed)).toBeLessThanOrEqual(10);
+    }
+    expect(memoryDrawCount(3, "seed")).toBe(3);
+    expect(memoryDrawCount(0, "seed")).toBe(0);
   });
 
   it("draws the same memories for the same seed and different ones otherwise", () => {

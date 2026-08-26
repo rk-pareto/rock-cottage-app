@@ -28,8 +28,16 @@ export default async function SignInPage({ searchParams }: PageProps<"/auth/sign
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center gap-7 px-6 py-12">
-      {/* The wordmark is the whole brand moment: serif, oversized, left-aligned
-          against a rule. No badge, no emoji. */}
+      <div className="aspect-[4/3] w-full overflow-hidden rounded-2xl bg-subtle">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/cottage-dock.jpg"
+          alt="Rock Cottage, from the dock"
+          className="h-full w-full object-cover"
+        />
+      </div>
+      {/* The photo sets the place; the wordmark names it — serif, oversized,
+          left-aligned against a rule. No badge, no emoji. */}
       <header>
         <p className="label text-muted">Port Carling · Aug 31 – Sep 6</p>
         <h1 className="mt-3 border-b border-line pb-5 font-display text-[3rem] leading-[0.95] text-ink">

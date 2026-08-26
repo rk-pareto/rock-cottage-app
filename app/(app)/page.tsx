@@ -5,7 +5,7 @@ import { MealConfirmPrompt } from "@/components/meals/MealConfirmPrompt";
 import { Card, EmptyState, SectionLabel } from "@/components/ui/Card";
 import { RelativeTime } from "@/components/ui/RelativeTime";
 import { FeedLightboxProvider, type FeedLightboxItem } from "@/components/memories/FeedLightbox";
-import { FeedPhotoTile } from "@/components/memories/FeedPhotoTile";
+import { FeedPhotoCarousel } from "@/components/memories/FeedPhotoCarousel";
 import { requireMember } from "@/lib/auth/membership";
 import { getDogStatuses } from "@/lib/dogs";
 import {
@@ -67,18 +67,15 @@ export default async function HomePage() {
   ]);
 
   // Only the drawn memories get presigned URLs — no point signing the pool.
-  const drawn = pickSeeded(
-    memoryPool,
-    memoryDrawCount(meals.length),
-    memoryDrawSeed(),
-  );
+  const seed = memoryDrawSeed();
+  const drawn = pickSeeded(memoryPool, memoryDrawCount(memoryPool.length, seed), seed);
   const memories = drawn.length > 0 ? await withThumbnailUrls(drawn) : [];
   const today = cottageToday();
   const feed = withStayEvents(
     interleaveFeed(meals, memories),
     stayEventsFor(today),
   );
-  // The set a tap on any feed photo can swipe through — same order they
+  // The set a tap on any carousel photo can swipe through — same order they
   // appear in, since `interleaveFeed` never reorders `memories` itself.
   const feedLightboxItems: FeedLightboxItem[] = memories.map((memory) => ({
     id: memory.id,
@@ -135,19 +132,16 @@ export default async function HomePage() {
                   meal={item.meal}
                   today={today}
                 />
-              ) : item.kind === "memory" ? (
-                <FeedPhotoTile
-                  key={`memory-${item.memory.id}`}
-                  memory={{
-                    id: item.memory.id,
-                    kind: item.memory.kind,
-                    uploadedBy: item.memory.uploadedBy,
-                    thumbnailUrl: item.memory.thumbnailUrl,
-                    width: item.memory.width,
-                    height: item.memory.height,
-                    durationLabel: formatDuration(item.memory.durationSeconds),
-                    createdAt: item.memory.createdAt.toISOString(),
-                  }}
+              ) : item.kind === "memoryCarousel" ? (
+                <FeedPhotoCarousel
+                  key="memory-carousel"
+                  memories={item.memories.map((memory) => ({
+                    id: memory.id,
+                    kind: memory.kind,
+                    uploadedBy: memory.uploadedBy,
+                    thumbnailUrl: memory.thumbnailUrl,
+                    durationLabel: formatDuration(memory.durationSeconds),
+                  }))}
                 />
               ) : (
                 <StayTile key={`stay-${item.stay.kind}`} stay={item.stay} />
