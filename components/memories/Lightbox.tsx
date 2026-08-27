@@ -88,6 +88,10 @@ export function Lightbox({
 
   const windowStart = Math.max(0, index - WINDOW);
   const windowItems = items.slice(windowStart, Math.min(items.length, index + WINDOW + 1));
+  // Which panel the track is heading for. `index` doesn't move until the slide
+  // lands, so without this a clip only starts loading once it has already
+  // arrived — the pause everyone reads as a stutter.
+  const arrivingIndex = settle !== null ? index + settle : index;
 
   function finishSettle() {
     if (settleRef.current === null) return;
@@ -314,7 +318,11 @@ export function Lightbox({
                   {item.kind === "video" ? (
                     <VideoPane
                       item={item}
-                      active={isCurrent}
+                      // The panel sliding in counts as live too, so its clip
+                      // has the whole slide to load and start — it arrives
+                      // already playing instead of catching up afterwards.
+                      // The one sliding out keeps playing until it lands.
+                      active={isCurrent || slot === arrivingIndex}
                       controlled={isCurrent && controlledId === item.id}
                       onTakeControl={() => setControlledId(item.id)}
                     />
@@ -512,6 +520,9 @@ function VideoPane({
   // Where the pointer went down, so a swipe that merely ends on the clip
   // isn't mistaken for a tap asking for sound.
   const pressedAt = useRef<{ x: number; y: number } | null>(null);
+  // Whether frames are actually coming out yet. Until they are, the poster
+  // stays on top — a `<video>` showing nothing is the flash we're avoiding.
+  const [rolling, setRolling] = useState(false);
 
   const autoplaying = active && !controlled && !refused && !reducedMotion;
   const showPlayer = active && (controlled || autoplaying);
@@ -539,20 +550,28 @@ function VideoPane({
     return () => video?.pause();
   }, [showPlayer]);
 
-  if (!showPlayer) {
-    return (
-      <div className="relative flex h-full w-full items-center justify-center">
-        {posterUrl ? (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            src={posterUrl}
-            alt=""
-            aria-hidden="true"
-            draggable={false}
-            className="absolute inset-0 h-full w-full object-contain"
-          />
-        ) : null}
-        {active ? (
+  // The player is gone, so the next one starts behind its poster again.
+  if (!showPlayer && rolling) setRolling(false);
+
+  return (
+    <div className="relative flex h-full w-full items-center justify-center">
+      {/* The poster is never torn down for the player — it lies underneath
+          until real frames are on screen, so arriving on a clip looks like
+          the still coming to life rather than one element swapped for
+          another. */}
+      {posterUrl ? (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img
+          src={posterUrl}
+          alt=""
+          aria-hidden="true"
+          draggable={false}
+          className="absolute inset-0 h-full w-full object-contain"
+        />
+      ) : null}
+
+      {!showPlayer ? (
+        active ? (
           <button
             type="button"
             onClick={onTakeControl}
@@ -563,43 +582,49 @@ function VideoPane({
           </button>
         ) : (
           <PlayGlyph className="relative h-10 w-10 text-white/70" />
-        )}
-      </div>
-    );
-  }
+        )
+      ) : null}
 
-  return (
-    <div className="relative flex h-full w-full items-center justify-center">
-      <video
-        ref={videoRef}
-        key={item.id}
-        src={`/api/memories/${item.id}/view`}
-        poster={posterUrl}
-        controls={controlled}
-        autoPlay
-        muted={!controlled}
-        playsInline
-        preload="metadata"
-        // Before the native controls are up the clip has no UI of its own, so
-        // the whole frame is the "turn the sound on" target — but only for a
-        // press that stayed put. Paging past a muted clip must not unmute it.
-        onPointerDown={(event) => {
-          pressedAt.current = { x: event.clientX, y: event.clientY };
-        }}
-        onClick={
-          controlled
-            ? undefined
-            : (event) => {
-                const from = pressedAt.current;
-                pressedAt.current = null;
-                if (from && Math.hypot(event.clientX - from.x, event.clientY - from.y) > 10) return;
-                onTakeControl();
-              }
-        }
-        className="h-full w-full object-contain"
-      />
+      {showPlayer ? (
+        <video
+          ref={videoRef}
+          key={item.id}
+          src={`/api/memories/${item.id}/view`}
+          poster={posterUrl}
+          controls={controlled}
+          autoPlay
+          muted={!controlled}
+          playsInline
+          // The clip is about to play either way, so buffer it properly rather
+          // than fetching metadata and then stalling on the first frame.
+          preload="auto"
+          onPlaying={() => setRolling(true)}
+          // Before the native controls are up the clip has no UI of its own,
+          // so the whole frame is the "turn the sound on" target — but only
+          // for a press that stayed put. Paging past a muted clip must not
+          // unmute it.
+          onPointerDown={(event) => {
+            pressedAt.current = { x: event.clientX, y: event.clientY };
+          }}
+          onClick={
+            controlled
+              ? undefined
+              : (event) => {
+                  const from = pressedAt.current;
+                  pressedAt.current = null;
+                  if (from && Math.hypot(event.clientX - from.x, event.clientY - from.y) > 10) {
+                    return;
+                  }
+                  onTakeControl();
+                }
+          }
+          className={`relative h-full w-full object-contain transition-opacity duration-200 ${
+            rolling ? "opacity-100" : "opacity-0"
+          }`}
+        />
+      ) : null}
 
-      {autoplaying ? (
+      {autoplaying && rolling ? (
         <button
           type="button"
           onClick={onTakeControl}
