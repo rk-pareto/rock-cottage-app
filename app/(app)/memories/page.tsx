@@ -5,10 +5,10 @@ import {
   formatDuration,
   getFavoriteMemoryIds,
   getMemories,
+  isShareable,
   withThumbnailUrls,
 } from "@/lib/memories";
 import { isStorageConfigured } from "@/lib/storage/s3";
-import { MAX_SHAREABLE_VIDEO_BYTES } from "@/lib/validation/schemas";
 import { MemoriesClient } from "./MemoriesClient";
 
 export const metadata: Metadata = { title: "Memories · Rock Cottage" };
@@ -35,7 +35,7 @@ export default async function MemoriesPage() {
           processingStatus: r.processingStatus,
           thumbnailUrl: r.thumbnailUrl,
           durationLabel: formatDuration(r.durationSeconds),
-          shareable: r.kind === "image" || r.originalBytes <= MAX_SHAREABLE_VIDEO_BYTES,
+          shareable: isShareable(r),
           createdAt: r.createdAt.toISOString(),
           favorited: favoriteIds.has(r.id),
         }))}

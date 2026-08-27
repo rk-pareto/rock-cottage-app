@@ -224,12 +224,32 @@ export const media = pgTable(
       .default("pending")
       .$type<ProcessingState>(),
     processingError: text("processing_error"),
+    /**
+     * Videos only: the capped-1080p H.264/AAC MP4 built so a clip recorded as
+     * HEVC plays for everyone, not just the phone that shot it. Null on an
+     * image, and null on a video whose original was already a fine playback
+     * copy — see `playbackStatus`.
+     */
+    playbackKey: text("playback_key"),
+    /** Size of whatever `/view` actually serves, so `shareable` can be
+     *  computed from the bytes that would really be shared. */
+    playbackBytes: bigint("playback_bytes", { mode: "number" }),
+    /**
+     * The transcode pass, tracked separately from `processingStatus`: a clip
+     * is visible and playable-where-it-can-be the moment its poster is
+     * handled, and this enhancement lands later. Null on images.
+     */
+    playbackStatus: varchar("playback_status", { length: 20 }).$type<ProcessingState>(),
+    playbackError: text("playback_error"),
     createdAt,
     updatedAt,
   },
   (t) => [
     index("media_created_at_idx").on(t.createdAt.desc()),
     index("media_status_created_at_idx").on(t.processingStatus, t.createdAt.desc()),
+    // The boot sweep asks for exactly this: unfinished playback passes,
+    // oldest first.
+    index("media_playback_status_created_at_idx").on(t.playbackStatus, t.createdAt),
   ],
 );
 

@@ -1,4 +1,8 @@
 import "server-only";
+import { createReadStream, createWriteStream } from "node:fs";
+import { stat } from "node:fs/promises";
+import type { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import {
   DeleteObjectsCommand,
   GetObjectCommand,
@@ -139,6 +143,42 @@ export const displayKey = (memoryId: string) => `memories/${memoryId}/display.we
 export const thumbnailKey = (memoryId: string) => `memories/${memoryId}/thumbnail.webp`;
 /** The frame the browser grabbed from a video, exactly as it was sent. */
 export const posterKey = (memoryId: string) => `memories/${memoryId}/poster.jpg`;
+/** The transcoded copy a video is played back and shared from. Deterministic,
+ *  so re-running a transcode simply overwrites the previous attempt. */
+export const playbackKey = (memoryId: string) => `memories/${memoryId}/playback.mp4`;
+
+/**
+ * Stream an object down to a local file. ffmpeg needs seekable input for an
+ * MP4/MOV, and a clip is far too big to hold in the container's memory just to
+ * get it onto disk (spec §14 memory discipline).
+ */
+export async function getObjectToFile(key: string, destination: string): Promise<void> {
+  const response = await s3().send(new GetObjectCommand({ Bucket: BUCKET_NAME, Key: key }));
+  const body = response.Body as Readable | undefined;
+  if (!body) throw new Error(`Object ${key} had no body`);
+  await pipeline(body, createWriteStream(destination));
+}
+
+/** Upload straight from disk, for the same reason. */
+export async function putObjectFromFile(
+  key: string,
+  filePath: string,
+  contentType: string,
+): Promise<number> {
+  const { size } = await stat(filePath);
+  await s3().send(
+    new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+      Body: createReadStream(filePath),
+      // A stream body carries no length of its own, and the bucket won't take
+      // it chunked.
+      ContentLength: size,
+      ContentType: contentType,
+    }),
+  );
+  return size;
+}
 
 /**
  * Stream an object straight through instead of buffering it. Videos are far

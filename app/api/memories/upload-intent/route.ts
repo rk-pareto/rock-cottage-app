@@ -56,6 +56,9 @@ export async function POST(request: Request) {
       durationSeconds: isVideo && durationSeconds !== undefined ? Math.round(durationSeconds) : null,
       uploadedByMemberId: member.id,
       processingStatus: "pending",
+      // A clip queues for its playback copy from the moment the row exists, so
+      // the boot sweep also picks up uploads that never made it to /complete.
+      playbackStatus: isVideo ? "pending" : null,
     })
     .returning({ id: media.id });
 

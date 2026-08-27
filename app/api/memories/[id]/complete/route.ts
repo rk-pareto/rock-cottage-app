@@ -1,10 +1,11 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { media } from "@/db/schema";
 import { requireMember } from "@/lib/auth/membership";
 import { processImage } from "@/lib/storage/process";
 import { displayKey, getObjectBytes, putObjectBytes, thumbnailKey } from "@/lib/storage/s3";
+import { enqueueTranscode } from "@/lib/storage/transcode";
 import { uuidSchema } from "@/lib/validation/schemas";
 
 export const dynamic = "force-dynamic";
@@ -15,9 +16,10 @@ export const maxDuration = 120;
  * Step 2 (spec §14.5): the browser has finished PUTting the original, so read
  * it back and build the derivatives.
  *
- * A photo is derived from the upload itself. A video is derived from the
- * poster frame the browser captured and PUT alongside it — the clip is stored
- * and played back untouched, so no video decoding happens on the server.
+ * A photo is derived from the upload itself. A video's tile is derived from
+ * the poster frame the browser captured and PUT alongside it, so nothing here
+ * has to open the clip; its playback copy is built afterwards, off the
+ * response path, by the transcode queue.
  *
  * Original preservation outranks derivative generation — a processing failure
  * marks the row "failed" and leaves the original object completely alone
@@ -39,9 +41,20 @@ export async function POST(_request: Request, ctx: RouteContext<"/api/memories/[
 
   const [item] = await db.select().from(media).where(eq(media.id, parsedId.data)).limit(1);
   if (!item) return NextResponse.json({ error: "Unknown memory" }, { status: 404 });
-  if (item.processingStatus === "ready") return NextResponse.json({ status: "ready" });
 
   const isVideo = item.kind === "video";
+
+  // The clip's bytes are in the bucket, so its playback copy can start being
+  // built. This runs after the response is sent and nothing waits on it: a
+  // multi-minute encode must never depend on a phone holding a socket open.
+  if (isVideo) {
+    after(() => {
+      enqueueTranscode(item.id);
+    });
+  }
+
+  if (item.processingStatus === "ready") return NextResponse.json({ status: "ready" });
+
   const sourceKey = isVideo ? item.posterKey : item.originalKey;
 
   // Nothing to derive from: the clip itself is already safely in the bucket.

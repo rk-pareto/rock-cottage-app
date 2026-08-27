@@ -9,10 +9,11 @@ export const dynamic = "force-dynamic";
 /**
  * Inline view of a memory — used as the lightbox `src`.
  *
- * A photo resolves to its optimized display copy. A video resolves to the
- * original clip, redirected straight at the bucket so range requests (the
- * scrubbing and buffering a `<video>` element does) are served by S3 rather
- * than proxied through Next.
+ * A photo resolves to its optimized display copy. A video resolves to its
+ * transcoded playback copy — or the original, while that copy is still being
+ * made or when the original was already fine — redirected straight at the
+ * bucket so range requests (the scrubbing and buffering a `<video>` element
+ * does) are served by S3 rather than proxied through Next.
  *
  * `?variant=poster` returns the still behind a video, for its poster frame.
  */
@@ -32,7 +33,9 @@ export async function GET(request: Request, ctx: RouteContext<"/api/memories/[id
 
   const wantsPoster = new URL(request.url).searchParams.get("variant") === "poster";
   const key =
-    memory.kind === "video" && !wantsPoster ? memory.originalKey : memory.displayKey;
+    memory.kind === "video" && !wantsPoster
+      ? (memory.playbackKey ?? memory.originalKey)
+      : memory.displayKey;
 
   if (!key) return NextResponse.json({ error: "Not ready" }, { status: 404 });
 

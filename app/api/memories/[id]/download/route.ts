@@ -11,8 +11,12 @@ export const dynamic = "force-dynamic";
  * the bucket itself is never public.
  *
  * `?variant=original` returns the untouched upload, anything else the
- * optimized display copy. A video has no optimized copy — it is stored exactly
- * as recorded — so both variants give back the clip itself.
+ * optimized display copy.
+ *
+ * For a video, `?variant=playback` returns the transcoded MP4 (404 until that
+ * pass has finished, and for a clip whose original needed no transcode).
+ * Everything else gives back the clip exactly as recorded — a download should
+ * hand over what the phone actually shot.
  */
 export async function GET(request: Request, ctx: RouteContext<"/api/memories/[id]/download">) {
   try {
@@ -28,9 +32,17 @@ export async function GET(request: Request, ctx: RouteContext<"/api/memories/[id
   const memory = await getMemoryById(parsedId.data);
   if (!memory) return NextResponse.json({ error: "Unknown memory" }, { status: 404 });
 
-  const wantsOriginal = new URL(request.url).searchParams.get("variant") === "original";
+  const variant = new URL(request.url).searchParams.get("variant");
+  const base = memory.originalFilename.replace(/\.[^.]+$/, "");
 
-  if (wantsOriginal || memory.kind === "video") {
+  if (memory.kind === "video" && variant === "playback") {
+    if (!memory.playbackKey) {
+      return NextResponse.json({ error: "There's no optimized copy of that clip." }, { status: 404 });
+    }
+    return NextResponse.redirect(await presignDownload(memory.playbackKey, `${base}.mp4`));
+  }
+
+  if (variant === "original" || memory.kind === "video") {
     const url = await presignDownload(memory.originalKey, memory.originalFilename);
     return NextResponse.redirect(url);
   }
@@ -39,7 +51,6 @@ export async function GET(request: Request, ctx: RouteContext<"/api/memories/[id
     return NextResponse.json({ error: "The optimized copy isn't ready yet." }, { status: 409 });
   }
 
-  const base = memory.originalFilename.replace(/\.[^.]+$/, "");
   const url = await presignDownload(memory.displayKey, `${base}.webp`);
   return NextResponse.redirect(url);
 }

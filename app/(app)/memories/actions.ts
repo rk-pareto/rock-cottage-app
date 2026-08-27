@@ -41,9 +41,13 @@ export async function deleteMemory(memoryId: string): Promise<ActionResult> {
   // best-effort — a failure here must not report the delete as failed.
   try {
     await deleteObjects(
-      [item.originalKey, item.displayKey, item.thumbnailKey, item.posterKey].filter(
-        (k): k is string => Boolean(k),
-      ),
+      [
+        item.originalKey,
+        item.displayKey,
+        item.thumbnailKey,
+        item.posterKey,
+        item.playbackKey,
+      ].filter((k): k is string => Boolean(k)),
     );
   } catch (error) {
     console.error("deleteMemory: object cleanup failed", item.id, error);

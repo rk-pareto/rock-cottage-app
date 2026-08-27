@@ -37,3 +37,4 @@ A living backlog of ideas, feature requests, bug fixes, and polish items for the
 - [x] Shopping list batch confirmation ("Got it" button)
 - [x] Shopping pickup activity tile in Home feed
 - [x] Simplify Public Goods (Bringing) items — remove packed/selection state
+- [x] Video transcoding — server-made H.264/AAC playback copy so HEVC clips play everywhere

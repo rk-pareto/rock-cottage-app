@@ -31,27 +31,33 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/memories/[i
 
   const base = memory.originalFilename.replace(/\.[^.]+$/, "").replace(/"/g, "") || "memory";
 
-  // A clip goes out exactly as recorded — re-encoding video here would cost
-  // far more than the share is worth, and it is streamed rather than buffered.
+  // A clip goes out as its transcoded playback copy where there is one, so
+  // what lands in WhatsApp plays on the recipient's phone whatever recorded
+  // it — and is small enough to get through at all. Nothing is encoded here;
+  // the bytes are streamed rather than buffered either way.
   if (memory.kind === "video") {
-    if (memory.originalBytes > MAX_SHAREABLE_VIDEO_BYTES) {
+    const bytes = memory.playbackBytes ?? memory.originalBytes;
+    if (bytes > MAX_SHAREABLE_VIDEO_BYTES) {
       return NextResponse.json({ error: "That video is too big to share." }, { status: 413 });
     }
 
     let stream;
     try {
-      stream = await getObjectStream(memory.originalKey);
+      stream = await getObjectStream(memory.playbackKey ?? memory.originalKey);
     } catch (error) {
       console.error("Share stream failed", error);
       return NextResponse.json({ error: "Couldn't prepare the video." }, { status: 500 });
     }
 
-    const extension = memory.originalFilename.match(/\.[^.]+$/)?.[0] ?? "";
+    const filename = memory.playbackKey
+      ? `${base}.mp4`
+      : `${base}${memory.originalFilename.match(/\.[^.]+$/)?.[0] ?? ""}`;
+    const fallbackType = memory.playbackKey ? "video/mp4" : memory.originalContentType;
     return new NextResponse(stream.body, {
       headers: {
-        "content-type": stream.contentType ?? memory.originalContentType,
+        "content-type": stream.contentType ?? fallbackType,
         ...(stream.contentLength ? { "content-length": String(stream.contentLength) } : {}),
-        "content-disposition": `inline; filename="${base}${extension}"`,
+        "content-disposition": `inline; filename="${filename}"`,
         "cache-control": "private, max-age=300",
       },
     });

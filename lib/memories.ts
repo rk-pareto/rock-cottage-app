@@ -3,12 +3,16 @@ import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { media, members, memoryFavorites, type MediaKind } from "@/db/schema";
 import { presignView } from "@/lib/storage/s3";
+import { MAX_SHAREABLE_VIDEO_BYTES } from "@/lib/validation/schemas";
 
 export type MemoryRow = {
   id: string;
   kind: MediaKind;
   originalFilename: string;
   originalBytes: number;
+  /** Size of what `/view` and `/share` actually serve for a video; null on an
+   *  image and until the playback pass has finished. */
+  playbackBytes: number | null;
   uploadedBy: string;
   uploadedByMemberId: string;
   processingStatus: string;
@@ -29,6 +33,7 @@ function selectMemories() {
       kind: media.kind,
       originalFilename: media.originalFilename,
       originalBytes: media.originalBytes,
+      playbackBytes: media.playbackBytes,
       uploadedBy: members.displayName,
       uploadedByMemberId: media.uploadedByMemberId,
       processingStatus: media.processingStatus,
@@ -88,6 +93,19 @@ export async function getFavoriteMemoryIds(memberId: string): Promise<Set<string
 export async function getMemoryById(id: string) {
   const [row] = await db.select().from(media).where(eq(media.id, id)).limit(1);
   return row ?? null;
+}
+
+/**
+ * Whether the Share button should appear: the OS share sheet needs the whole
+ * file in memory, which a phone won't do past a point.
+ *
+ * Measured against whatever `/share` would actually send — the transcoded
+ * playback copy once it exists — so a clip that was too big as recorded
+ * becomes shareable the moment its playback pass lands.
+ */
+export function isShareable(memory: Pick<MemoryRow, "kind" | "originalBytes" | "playbackBytes">) {
+  if (memory.kind === "image") return true;
+  return (memory.playbackBytes ?? memory.originalBytes) <= MAX_SHAREABLE_VIDEO_BYTES;
 }
 
 /** `0:07`, `1:42`, `12:05` — the badge in the corner of a video tile. */

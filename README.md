@@ -173,7 +173,8 @@ session, never from the browser.
 
 Photos and videos share one screen, one table (`media`) and one delete rule.
 The original upload is sacred either way: it is stored exactly as the phone
-sent it — never recompressed, resized, or re-encoded.
+sent it — never recompressed, resized, or re-encoded. Everything the app shows
+or shares is a derived copy alongside it.
 
 1. Client asks `/api/memories/upload-intent` for a presigned PUT.
 2. Browser uploads the original **straight to the bucket**, not through Next.
@@ -193,21 +194,57 @@ iPhones default to HEIC, `lib/storage/process.ts` falls back to `heic-decode`
 
 ### Videos
 
-Clips are stored and played back exactly as recorded — no transcoding, so
-**there is no ffmpeg in the deploy**. Instead the browser does the one thing a
-server would have needed a video decoder for: before uploading, it reads the
-clip's dimensions and length and draws a frame to a canvas. That JPEG is PUT
-alongside the clip and becomes the poster, the thumbnail and the tile in the
-home feed — the server only ever processes a still.
+The **original is never touched** — but a clip also gets a server-made
+*playback copy*, exactly as a photo gets a display copy. iPhones record HEVC,
+which doesn't play on Chrome or Android, and a 4K original is far too big for
+the share sheet; the playback copy fixes both.
+
+The tile still comes from the browser: before uploading it reads the clip's
+dimensions and length and draws a frame to a canvas. That JPEG is PUT alongside
+the clip and becomes the poster, the thumbnail and the tile in the home feed.
+If the browser can't decode the clip at all it uploads with no poster and shows
+a placeholder tile — the clip itself is intact either way.
 
 - Up to 512 MB per clip (photos stay at 60 MB); uploads show a real progress bar.
 - `/api/memories/[id]/view` redirects a clip straight at the bucket so S3 serves
   the range requests that scrubbing and buffering depend on.
-- Share hands the OS the clip untouched, and is hidden above 64 MB — past that
-  a phone can't hold the file in memory and Download is the honest option.
-- If the browser can't decode the clip (an HEVC `.mov` opened in Chrome, say),
-  it uploads with no poster and shows a placeholder tile. The clip is intact and
-  still plays wherever its codec is supported.
+- Share sends the playback copy, and is hidden when even that is above 64 MB —
+  past which a phone can't hold the file in memory and Download is the honest
+  option. Download always offers the original (`?variant=playback` for the MP4).
+
+#### The playback copy
+
+`lib/storage/transcode.ts` is an in-process queue, **strictly one encode at a
+time** so a transcode can't starve request serving. ffmpeg and ffprobe come
+from the `ffmpeg-static` / `ffprobe-static` packages, so there is no Dockerfile
+or Nixpacks change (`FFMPEG_PATH` / `FFPROBE_PATH` override them).
+
+- Output: MP4, `libx264 -preset veryfast -crf 23 -pix_fmt yuv420p`, longest edge
+  capped at 1920, `aac 128k` (an existing AAC track ≤160k is copied through),
+  `-movflags +faststart`. Rotation is applied by ffmpeg, so a portrait clip
+  stays portrait.
+- **Skipped when pointless**: an original that is already H.264-in-MP4, ≤1080p
+  and under ~8 Mbps is marked ready with no playback object — "the original is
+  already fine". A `.mov` is never skipped; that's the case this exists for.
+- Tracked in `playback_status` (`pending | processing | ready | failed`),
+  separate from `processing_status`: a clip is visible and playable the moment
+  its poster is handled, and this lands afterwards. A failure is invisible in
+  the UI by design — the original still plays wherever it can, and the reason
+  is in `playback_error`.
+- Triggered by `/api/memories/[id]/complete` via `after()` (nothing waits on the
+  encode) and by a boot sweep in `instrumentation.ts`, which re-queues every
+  `pending`/`processing` clip oldest-first. That sweep is both the backfill for
+  older videos and the crash recovery for a deploy that interrupted a job — the
+  queue is in memory, so a job is never lost, only re-run.
+- Retry a `failed` pass by setting `playback_status` back to `pending` and
+  restarting.
+
+The argument builder and the skip rule are pure and covered by
+`tests/video.test.ts`. An end-to-end encode is opt-in:
+
+```bash
+RUN_TRANSCODE_SMOKE=1 npx vitest run tests/transcode.smoke.test.ts
+```
 
 The bucket is private. Only short-lived presigned URLs ever reach the browser,
 and credentials are server-side only. To verify that end to end:
