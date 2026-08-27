@@ -13,6 +13,9 @@ export type MemoryRow = {
   /** Size of what `/view` and `/share` actually serve for a video; null on an
    *  image and until the playback pass has finished. */
   playbackBytes: number | null;
+  /** Bucket key of the transcoded MP4. Null on an image, until the pass has
+   *  finished, and on a clip that already was one — see `hasPlaybackCopy`. */
+  playbackKey: string | null;
   uploadedBy: string;
   uploadedByMemberId: string;
   processingStatus: string;
@@ -34,6 +37,7 @@ function selectMemories() {
       originalFilename: media.originalFilename,
       originalBytes: media.originalBytes,
       playbackBytes: media.playbackBytes,
+      playbackKey: media.playbackKey,
       uploadedBy: members.displayName,
       uploadedByMemberId: media.uploadedByMemberId,
       processingStatus: media.processingStatus,
@@ -106,6 +110,19 @@ export async function getMemoryById(id: string) {
 export function isShareable(memory: Pick<MemoryRow, "kind" | "originalBytes" | "playbackBytes">) {
   if (memory.kind === "image") return true;
   return (memory.playbackBytes ?? memory.originalBytes) <= MAX_SHAREABLE_VIDEO_BYTES;
+}
+
+/**
+ * Whether there is a separate transcoded MP4 to offer — the only case where
+ * `/download?variant=playback` has anything to hand back, and the only case
+ * where `/share` sends MP4 bytes rather than the original's.
+ *
+ * A null key means both the pass that hasn't landed yet and the clip that was
+ * already an ordinary H.264 MP4 and so needed no second copy; neither has an
+ * object to download.
+ */
+export function hasPlaybackCopy(memory: Pick<MemoryRow, "kind" | "playbackKey">) {
+  return memory.kind === "video" && memory.playbackKey !== null;
 }
 
 /** `0:07`, `1:42`, `12:05` — the badge in the corner of a video tile. */

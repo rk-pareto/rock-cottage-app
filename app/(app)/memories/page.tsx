@@ -5,6 +5,7 @@ import {
   formatDuration,
   getFavoriteMemoryIds,
   getMemories,
+  hasPlaybackCopy,
   isShareable,
   withThumbnailUrls,
 } from "@/lib/memories";
@@ -36,6 +37,7 @@ export default async function MemoriesPage() {
           thumbnailUrl: r.thumbnailUrl,
           durationLabel: formatDuration(r.durationSeconds),
           shareable: isShareable(r),
+          hasPlaybackCopy: hasPlaybackCopy(r),
           createdAt: r.createdAt.toISOString(),
           favorited: favoriteIds.has(r.id),
         }))}

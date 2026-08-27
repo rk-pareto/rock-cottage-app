@@ -24,6 +24,10 @@ export type MemoryCardData = {
   durationLabel: string | null;
   /** False for clips too large to hand to the OS share sheet in one piece. */
   shareable: boolean;
+  /** Whether a transcoded MP4 exists: false on an image, on a clip that was
+   *  already an ordinary MP4, and until the pass lands. Decides both the
+   *  optimized download and what `/share` will name its bytes. */
+  hasPlaybackCopy: boolean;
   createdAt: string;
   /** Whether the *current* member has favorited this memory — never other
    *  members' favorites, which stay private to them. */
@@ -166,11 +170,15 @@ export function MemoriesClient({
       if (!response.ok) throw new Error("Share bytes unavailable");
       const blob = await response.blob();
       const base = memory.originalFilename.replace(/\.[^.]+$/, "") || "memory";
-      // Photos always come back re-encoded as JPEG; clips come back as they
-      // were recorded, so their own extension is the right one.
+      // Photos always come back re-encoded as JPEG. A clip comes back as its
+      // playback MP4 wherever one exists, and only otherwise as it was
+      // recorded — so a .mov original must still be handed to the share sheet
+      // as .mp4, or the OS is told the wrong thing about the bytes inside.
       const name =
         memory.kind === "video"
-          ? `${base}${memory.originalFilename.match(/\.[^.]+$/)?.[0] ?? ".mp4"}`
+          ? memory.hasPlaybackCopy
+            ? `${base}.mp4`
+            : `${base}${memory.originalFilename.match(/\.[^.]+$/)?.[0] ?? ".mp4"}`
           : `${base}.jpg`;
       return new File([blob], name, { type: blob.type || "application/octet-stream" });
     });
@@ -446,19 +454,29 @@ export function MemoriesClient({
                     : "Share photo"}
               </button>
             ) : null}
-            {lightboxMemory.kind === "image" ? (
+            {/* Only offered where there is a second copy to fetch: every
+                image has its display copy, but a clip only has a playback MP4
+                if it needed one and the pass has landed. Otherwise
+                `?variant=playback` is a 404 behind a button. */}
+            {lightboxMemory.kind === "image" || lightboxMemory.hasPlaybackCopy ? (
               <a
-                href={`/api/memories/${lightboxMemory.id}/download?variant=display`}
+                href={`/api/memories/${lightboxMemory.id}/download?variant=${
+                  lightboxMemory.kind === "video" ? "playback" : "display"
+                }`}
                 className="tap flex-1 rounded-xl bg-white/12 px-4 py-3 text-center text-xs font-extrabold tracking-tight text-white transition-colors hover:bg-white/20"
               >
                 Download optimized
               </a>
             ) : null}
+            {/* On its own this is simply "the video"; beside the optimized
+                copy it has to say which of the two it hands over. */}
             <a
               href={`/api/memories/${lightboxMemory.id}/download?variant=original`}
               className="tap flex-1 rounded-xl bg-white/12 px-4 py-3 text-center text-xs font-extrabold tracking-tight text-white transition-colors hover:bg-white/20"
             >
-              {lightboxMemory.kind === "video" ? "Download video" : "Download original"}
+              {lightboxMemory.kind === "video" && !lightboxMemory.hasPlaybackCopy
+                ? "Download video"
+                : "Download original"}
             </a>
             {canDelete(lightboxMemory) ? (
               confirmingId === lightboxMemory.id ? (
