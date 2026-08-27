@@ -66,16 +66,47 @@ const ACTIONS: {
   },
 ];
 
-// Half a second is plenty of time to register "yep, that logged" without
-// lingering long enough to feel like a status, not a confirmation.
-const CONFIRM_MS = 550;
+// Long enough to actually register as "yep, that logged" — 550ms read as a
+// flicker in practice, easy to miss on a real tap-and-glance-away.
+const CONFIRM_MS = 1000;
 
-function CheckIcon() {
+// A tap locks its own button for the rest of the household visit's worth of
+// wiggle room — long enough that a fat-fingered double tap can't land a
+// second event, short enough it's back for the next real outing. Scoped to
+// this device only (localStorage), so it never blocks someone else's tap.
+const LOCKOUT_MS = 15 * 60 * 1000;
+
+function lockStorageKey(slug: string, type: PetEventType) {
+  return `dog-lock:${slug}:${type}`;
+}
+
+function readLockedUntil(slug: string, type: PetEventType): number | null {
+  try {
+    const raw = window.localStorage.getItem(lockStorageKey(slug, type));
+    if (!raw) return null;
+    const until = Number(raw);
+    return Number.isFinite(until) && until > new Date().getTime() ? until : null;
+  } catch {
+    // Private browsing / storage disabled — no persistent lock, but the
+    // in-memory one set after a tap still covers this page load.
+    return null;
+  }
+}
+
+function writeLockedUntil(slug: string, type: PetEventType, until: number) {
+  try {
+    window.localStorage.setItem(lockStorageKey(slug, type), String(until));
+  } catch {
+    // Ignore — see readLockedUntil.
+  }
+}
+
+function CheckIcon({ className = "h-5 w-5" }: { className?: string }) {
   return (
     <svg
       viewBox="0 0 24 24"
       aria-hidden="true"
-      className="h-4 w-4 animate-[check-pop_0.18s_ease-out]"
+      className={`animate-[check-pop_0.18s_ease-out] ${className}`}
       fill="none"
       stroke="currentColor"
       strokeWidth={2.75}
@@ -114,18 +145,59 @@ export function DogSection({ slug, name, latest, recent, currentMemberName }: Do
   // Which actions are currently showing their brief "recorded" checkmark.
   const [confirmedTypes, setConfirmedTypes] = useState<Partial<Record<PetEventType, boolean>>>({});
   const confirmTimeouts = useRef<Partial<Record<PetEventType, ReturnType<typeof setTimeout>>>>({});
+  // The big center-screen confirmation flash — this is the one people
+  // actually notice; the button badge above is a quieter echo of it.
+  const [centerConfirm, setCenterConfirm] = useState<PetEventType | null>(null);
+  const centerConfirmTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Actions this device tapped recently enough that they're still locked out,
+  // mapped to the epoch ms their lock expires.
+  const [lockedUntil, setLockedUntil] = useState<Partial<Record<PetEventType, number>>>({});
+  const lockTimeouts = useRef<Partial<Record<PetEventType, ReturnType<typeof setTimeout>>>>({});
+
+  function clearLock(type: PetEventType) {
+    setLockedUntil((prev) => {
+      const next = { ...prev };
+      delete next[type];
+      return next;
+    });
+  }
+
+  function lock(type: PetEventType, until: number, delayMs: number) {
+    writeLockedUntil(slug, type, until);
+    setLockedUntil((prev) => ({ ...prev, [type]: until }));
+    const existing = lockTimeouts.current[type];
+    if (existing) clearTimeout(existing);
+    lockTimeouts.current[type] = setTimeout(() => clearLock(type), delayMs);
+  }
+
+  // Pick up any lock this device already set (e.g. the page was reloaded, or
+  // reopened, within the 15-minute window) and schedule it to lift on time.
+  useEffect(() => {
+    function restore(type: PetEventType) {
+      const until = readLockedUntil(slug, type);
+      if (until === null) return;
+      setLockedUntil((prev) => ({ ...prev, [type]: until }));
+      const delay = Math.max(0, until - new Date().getTime());
+      lockTimeouts.current[type] = setTimeout(() => clearLock(type), delay);
+    }
+    for (const { type } of ACTIONS) restore(type);
+  }, [slug]);
 
   useEffect(() => {
-    const timeouts = confirmTimeouts.current;
+    const confirmed = confirmTimeouts.current;
+    const locked = lockTimeouts.current;
     return () => {
-      Object.values(timeouts).forEach((id) => clearTimeout(id));
+      Object.values(confirmed).forEach((id) => clearTimeout(id));
+      Object.values(locked).forEach((id) => clearTimeout(id));
+      if (centerConfirmTimeout.current) clearTimeout(centerConfirmTimeout.current);
     };
   }, []);
 
   function handleTap(type: PetEventType) {
-    if (pendingType) return; // guards against double-taps
+    if (pendingType || lockedUntil[type]) return; // guards against double-taps
     setPendingType(type);
-    const now = new Date().toISOString();
+    const tappedAt = new Date();
+    const now = tappedAt.toISOString();
     setOptimistic((prev) => ({
       ...prev,
       [type]: { occurredAt: now, recordedBy: currentMemberName },
@@ -156,6 +228,12 @@ export function DogSection({ slug, name, latest, recent, currentMemberName }: Do
           return next;
         });
       }, CONFIRM_MS);
+
+      setCenterConfirm(type);
+      if (centerConfirmTimeout.current) clearTimeout(centerConfirmTimeout.current);
+      centerConfirmTimeout.current = setTimeout(() => setCenterConfirm(null), CONFIRM_MS);
+
+      lock(type, tappedAt.getTime() + LOCKOUT_MS, LOCKOUT_MS);
     });
   }
 
@@ -176,6 +254,8 @@ export function DogSection({ slug, name, latest, recent, currentMemberName }: Do
         {ACTIONS.map((action) => {
           const value = optimistic[action.type] ?? latest[action.type];
           const busy = pendingType === action.type;
+          const confirmed = Boolean(confirmedTypes[action.type]);
+          const locked = Boolean(lockedUntil[action.type]);
           return (
             <div key={action.type} className="flex flex-col gap-1.5">
               {/* Still the biggest thing on the screen — the flourish is gone,
@@ -183,7 +263,7 @@ export function DogSection({ slug, name, latest, recent, currentMemberName }: Do
               <button
                 type="button"
                 onClick={() => handleTap(action.type)}
-                disabled={Boolean(pendingType)}
+                disabled={Boolean(pendingType) || locked}
                 className={`tap flex w-full items-center gap-3 rounded-xl px-5 py-4 text-left text-[1.0625rem] font-extrabold tracking-tight text-white transition active:scale-[0.995] disabled:opacity-60 ${action.tone}`}
               >
                 {action.icon}
@@ -192,7 +272,7 @@ export function DogSection({ slug, name, latest, recent, currentMemberName }: Do
                   aria-hidden="true"
                   className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/20 text-lg leading-none"
                 >
-                  {confirmedTypes[action.type] ? <CheckIcon /> : "+"}
+                  {confirmed ? <CheckIcon /> : "+"}
                 </span>
               </button>
               <p className="flex flex-wrap items-baseline gap-x-2 px-1 text-sm">
@@ -218,6 +298,25 @@ export function DogSection({ slug, name, latest, recent, currentMemberName }: Do
 
       {sheetOpen ? (
         <EventSheet name={name} events={recent} onClose={() => setSheetOpen(false)} />
+      ) : null}
+
+      {centerConfirm ? (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-0 z-[60] flex items-center justify-center px-6"
+        >
+          <div
+            className="flex flex-col items-center gap-3 rounded-2xl bg-ink/95 px-8 py-7 text-paper shadow-[0_20px_50px_-12px_rgba(14,18,22,0.55)]"
+            style={{ animation: `confirm-flash ${CONFIRM_MS}ms ease-out both` }}
+          >
+            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white/15">
+              <CheckIcon className="h-8 w-8" />
+            </span>
+            <span className="text-sm font-extrabold tracking-tight">
+              {ACTIONS.find((a) => a.type === centerConfirm)?.label(name)}
+            </span>
+          </div>
+        </div>
       ) : null}
     </section>
   );

@@ -75,6 +75,31 @@ main {
   }
 }
 
+/* The center-screen confirmation flash for a dog action tap: pop in, hold,
+   fade out. Duration is set inline (it has to match the JS timeout that
+   unmounts it), so this only defines the shape. */
+@keyframes confirm-flash {
+  0% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  15% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  25% {
+    transform: scale(1);
+  }
+  75% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
 :where(a, button, input, textarea, select, [tabindex]):focus-visible {
   outline: 2px solid var(--color-pine);
   outline-offset: 2px;
