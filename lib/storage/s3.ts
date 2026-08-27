@@ -77,9 +77,17 @@ export function presignDownload(key: string, downloadFilename?: string): Promise
 
 /** Inline (no attachment header) — used for in-app viewing of derivatives. */
 export function presignView(key: string): Promise<string> {
-  return getSignedUrl(s3(), new GetObjectCommand({ Bucket: BUCKET_NAME, Key: key }), {
-    expiresIn: DOWNLOAD_URL_TTL_SECONDS,
-  });
+  return getSignedUrl(
+    s3(),
+    new GetObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+      // The bucket sets no cache headers of its own; without this the browser
+      // guesses, and the lightbox re-downloads photos it showed seconds ago.
+      ResponseCacheControl: "private, max-age=600",
+    }),
+    { expiresIn: DOWNLOAD_URL_TTL_SECONDS },
+  );
 }
 
 export async function getObjectBytes(key: string): Promise<Buffer> {

@@ -36,5 +36,13 @@ export async function GET(request: Request, ctx: RouteContext<"/api/memories/[id
 
   if (!key) return NextResponse.json({ error: "Not ready" }, { status: 404 });
 
-  return NextResponse.redirect(await presignView(key));
+  return NextResponse.redirect(await presignView(key), {
+    headers: {
+      // Let the browser reuse this redirect — and therefore the same signed
+      // URL, whose bytes it has cached — so swiping back to a photo doesn't
+      // re-download it. Kept well under the presign TTL so a cached redirect
+      // never points at an expired signature.
+      "cache-control": "private, max-age=300",
+    },
+  });
 }

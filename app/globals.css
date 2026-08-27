@@ -100,6 +100,21 @@ main {
   }
 }
 
+/* The photo viewer fades up over the page rather than cutting in. */
+@keyframes lightbox-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* The viewer's loading ring appears late, so a photo that arrives from cache
+   never flashes a spinner on its way in. */
+@keyframes spinner-in {
+  from {
+    opacity: 0;
+  }
+}
+
 :where(a, button, input, textarea, select, [tabindex]):focus-visible {
   outline: 2px solid var(--color-pine);
   outline-offset: 2px;
