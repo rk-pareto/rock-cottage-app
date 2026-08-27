@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronGlyph, PlayGlyph } from "@/components/ui/icons";
+import { ChevronGlyph, MutedGlyph, PlayGlyph } from "@/components/ui/icons";
 
 export type LightboxItem = {
   id: string;
@@ -20,7 +20,7 @@ export type LightboxItem = {
 /** How far past the finger's release a drag must have gone to turn the page. */
 const COMMIT_PX = 70;
 /** A flick this fast (px/ms) turns the page even from a short drag. */
-const FLICK_VELOCITY = 0.5;
+const FLICK_VELOCITY = 0.45;
 /** Downward drag distance that lets go of the viewer entirely. */
 const DISMISS_PX = 110;
 const DISMISS_VELOCITY = 0.55;
@@ -69,6 +69,11 @@ export function Lightbox({
   /** Which neighbor the track is animating toward; 0 is a spring-back. */
   const [settle, setSettle] = useState<-1 | 0 | 1 | null>(null);
   const [dismissing, setDismissing] = useState(false);
+  // A video only takes over the touch surface once someone taps it — until
+  // then it's something the pager swipes past like any photo, whether or not
+  // it happens to be autoplaying. Cleared on every page turn, so swiping back
+  // lands on a clip the pager still owns.
+  const [controlledId, setControlledId] = useState<string | null>(null);
 
   const gesture = useRef<{
     startX: number;
@@ -94,7 +99,10 @@ export function Lightbox({
     // never visibly moves.
     setSettle(null);
     setDrag({ x: 0, y: 0, axis: null });
-    if (to !== 0) onIndexChange(index + to);
+    if (to !== 0) {
+      setControlledId(null);
+      onIndexChange(index + to);
+    }
   }
 
   function beginSettle(to: -1 | 0 | 1) {
@@ -250,7 +258,11 @@ export function Lightbox({
     pointerEvents: dismissProgress > 0 ? "none" : undefined,
   };
 
-  const swipeable = current.kind === "image";
+  // Only a video someone has *taken control of* owns its touches (its scrub
+  // bar is a left-right gesture too). Deliberately not "a video that's
+  // playing": clips autoplay muted as they come into view, and the pager has
+  // to keep sliding over those.
+  const swipeable = !(current.kind === "video" && controlledId === current.id);
 
   return (
     <div
@@ -279,8 +291,6 @@ export function Lightbox({
 
       <div
         className={`relative flex-1 overflow-hidden ${swipeable ? "touch-none" : ""}`}
-        // A video has its own left-right gesture — scrubbing — so only a
-        // photo hands its touches to the pager.
         onTouchStart={swipeable ? onTouchStart : undefined}
         onTouchMove={swipeable ? onTouchMove : undefined}
         onTouchEnd={swipeable ? onTouchEnd : undefined}
@@ -302,7 +312,12 @@ export function Lightbox({
               <div key={item.id} className="h-full w-full shrink-0 p-2">
                 <div className="h-full w-full" style={isCurrent ? currentPanelStyle : undefined}>
                   {item.kind === "video" ? (
-                    <VideoPane item={item} active={isCurrent} />
+                    <VideoPane
+                      item={item}
+                      active={isCurrent}
+                      controlled={isCurrent && controlledId === item.id}
+                      onTakeControl={() => setControlledId(item.id)}
+                    />
                   ) : (
                     <PhotoPane item={item} near={Math.abs(slot - index) <= 1} />
                   )}
@@ -442,15 +457,89 @@ function PhotoPane({ item, near }: { item: LightboxItem; near: boolean }) {
 }
 
 /**
- * Off-track a clip is just its poster still — mounting a `<video>` per panel
- * would spin up decoders for clips nobody is watching. The real player mounts
- * when its panel becomes current, which also stops playback the moment a
- * playing clip is navigated away from.
+ * `prefers-reduced-motion`, read live so a mid-session change takes effect.
+ * Seeded synchronously rather than in an effect: a clip that autoplays for one
+ * frame before the effect catches up is exactly what the setting rules out.
  */
-function VideoPane({ item, active }: { item: LightboxItem; active: boolean }) {
-  const posterUrl = item.thumbnailUrl ? `/api/memories/${item.id}/view?variant=poster` : undefined;
+function useReducedMotion() {
+  const [reduced, setReduced] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+  );
 
-  if (!active) {
+  useEffect(() => {
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const sync = () => setReduced(query.matches);
+    sync();
+    query.addEventListener("change", sync);
+    return () => query.removeEventListener("change", sync);
+  }, []);
+
+  return reduced;
+}
+
+/**
+ * Off-track a clip is just its poster still, so a run of fast swipes glides
+ * over it like any photo — mounting a `<video>` per panel would spin up
+ * decoders for clips nobody is watching. The real player mounts when the panel
+ * becomes current and starts itself, muted; unmounting on the way out is what
+ * stops it, and a clip swiped back to starts over rather than resuming.
+ *
+ * Muted is the whole trick: browsers hand out silent autoplay for free but
+ * want a user gesture before any sound. So a tap "takes control" — it unmutes,
+ * brings up the native controls, and only then does the clip own its touches
+ * (see `swipeable`). Until then it's still just something the pager slides
+ * past, autoplaying or not.
+ */
+function VideoPane({
+  item,
+  active,
+  controlled,
+  onTakeControl,
+}: {
+  item: LightboxItem;
+  active: boolean;
+  controlled: boolean;
+  onTakeControl: () => void;
+}) {
+  const posterUrl = item.thumbnailUrl ? `/api/memories/${item.id}/view?variant=poster` : undefined;
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const reducedMotion = useReducedMotion();
+  // A browser can still say no — data saver, low power mode, a site setting.
+  // Once it has, this clip goes back to being tap-to-play.
+  const [refused, setRefused] = useState(false);
+  // Where the pointer went down, so a swipe that merely ends on the clip
+  // isn't mistaken for a tap asking for sound.
+  const pressedAt = useRef<{ x: number; y: number } | null>(null);
+
+  const autoplaying = active && !controlled && !refused && !reducedMotion;
+  const showPlayer = active && (controlled || autoplaying);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!showPlayer || !video) return;
+    // React's `muted` prop doesn't reliably reach the DOM property, and an
+    // unmuted autoplay is one every browser refuses — so set it on the element
+    // itself. Taking control is the gesture that buys the sound.
+    video.muted = !controlled;
+    if (controlled) return;
+    // play() rejects on a refusal, and again when the panel unmounts mid-load;
+    // either way it has to be caught, or it surfaces as an unhandled rejection.
+    // A refusal just drops back to the poster, one tap from playing.
+    video.play().catch(() => setRefused(true));
+  }, [controlled, showPlayer]);
+
+  // Detaching a media element is supposed to pause it, but say so outright:
+  // nothing should still be decoding on a panel that's slid off screen. The
+  // element goes with it, so swiping back always starts the clip over.
+  // Keyed on `showPlayer` alone — taking control must not trip this.
+  useEffect(() => {
+    const video = videoRef.current;
+    return () => video?.pause();
+  }, [showPlayer]);
+
+  if (!showPlayer) {
     return (
       <div className="relative flex h-full w-full items-center justify-center">
         {posterUrl ? (
@@ -463,20 +552,63 @@ function VideoPane({ item, active }: { item: LightboxItem; active: boolean }) {
             className="absolute inset-0 h-full w-full object-contain"
           />
         ) : null}
-        <PlayGlyph className="relative h-10 w-10 text-white/70" />
+        {active ? (
+          <button
+            type="button"
+            onClick={onTakeControl}
+            aria-label="Play video"
+            className="tap relative flex h-16 w-16 items-center justify-center rounded-full bg-ink/60 text-white backdrop-blur-sm transition-transform active:scale-95"
+          >
+            <PlayGlyph className="h-7 w-7 translate-x-0.5" />
+          </button>
+        ) : (
+          <PlayGlyph className="relative h-10 w-10 text-white/70" />
+        )}
       </div>
     );
   }
 
   return (
-    <video
-      key={item.id}
-      src={`/api/memories/${item.id}/view`}
-      poster={posterUrl}
-      controls
-      playsInline
-      preload="metadata"
-      className="h-full w-full object-contain"
-    />
+    <div className="relative flex h-full w-full items-center justify-center">
+      <video
+        ref={videoRef}
+        key={item.id}
+        src={`/api/memories/${item.id}/view`}
+        poster={posterUrl}
+        controls={controlled}
+        autoPlay
+        muted={!controlled}
+        playsInline
+        preload="metadata"
+        // Before the native controls are up the clip has no UI of its own, so
+        // the whole frame is the "turn the sound on" target — but only for a
+        // press that stayed put. Paging past a muted clip must not unmute it.
+        onPointerDown={(event) => {
+          pressedAt.current = { x: event.clientX, y: event.clientY };
+        }}
+        onClick={
+          controlled
+            ? undefined
+            : (event) => {
+                const from = pressedAt.current;
+                pressedAt.current = null;
+                if (from && Math.hypot(event.clientX - from.x, event.clientY - from.y) > 10) return;
+                onTakeControl();
+              }
+        }
+        className="h-full w-full object-contain"
+      />
+
+      {autoplaying ? (
+        <button
+          type="button"
+          onClick={onTakeControl}
+          aria-label="Unmute video"
+          className="tap absolute bottom-2 left-2 flex h-9 w-9 items-center justify-center rounded-full bg-ink/50 text-white/70 backdrop-blur-sm transition-colors hover:bg-ink/70 hover:text-white"
+        >
+          <MutedGlyph className="h-5 w-5" />
+        </button>
+      ) : null}
+    </div>
   );
 }

@@ -24,6 +24,22 @@ export function PlayGlyph({ className = "" }: { className?: string }) {
   );
 }
 
+/** A speaker with its sound struck out — marks a clip playing without audio. */
+export function MutedGlyph({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <path d="M11 5 6.5 9H3v6h3.5L11 19z" fill="currentColor" />
+      <path
+        d="m15.5 9.5 5 5m0-5-5 5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 /** Points left by default; rotate 180° for a "next" arrow. */
 export function ChevronGlyph({ className = "" }: { className?: string }) {
   return (
