@@ -142,9 +142,6 @@ export function DogSection({ slug, name, latest, recent, currentMemberName }: Do
   // Optimistic overlay so a tap feels instant; the server render reconciles it.
   const [optimistic, setOptimistic] = useState<Partial<Record<PetEventType, LatestEvent>>>({});
   const [pendingType, setPendingType] = useState<PetEventType | null>(null);
-  // Which actions are currently showing their brief "recorded" checkmark.
-  const [confirmedTypes, setConfirmedTypes] = useState<Partial<Record<PetEventType, boolean>>>({});
-  const confirmTimeouts = useRef<Partial<Record<PetEventType, ReturnType<typeof setTimeout>>>>({});
   // The big center-screen confirmation flash — this is the one people
   // actually notice; the button badge above is a quieter echo of it.
   const [centerConfirm, setCenterConfirm] = useState<PetEventType | null>(null);
@@ -184,10 +181,8 @@ export function DogSection({ slug, name, latest, recent, currentMemberName }: Do
   }, [slug]);
 
   useEffect(() => {
-    const confirmed = confirmTimeouts.current;
     const locked = lockTimeouts.current;
     return () => {
-      Object.values(confirmed).forEach((id) => clearTimeout(id));
       Object.values(locked).forEach((id) => clearTimeout(id));
       if (centerConfirmTimeout.current) clearTimeout(centerConfirmTimeout.current);
     };
@@ -218,17 +213,6 @@ export function DogSection({ slug, name, latest, recent, currentMemberName }: Do
         return;
       }
 
-      setConfirmedTypes((prev) => ({ ...prev, [type]: true }));
-      const existing = confirmTimeouts.current[type];
-      if (existing) clearTimeout(existing);
-      confirmTimeouts.current[type] = setTimeout(() => {
-        setConfirmedTypes((prev) => {
-          const next = { ...prev };
-          delete next[type];
-          return next;
-        });
-      }, CONFIRM_MS);
-
       setCenterConfirm(type);
       if (centerConfirmTimeout.current) clearTimeout(centerConfirmTimeout.current);
       centerConfirmTimeout.current = setTimeout(() => setCenterConfirm(null), CONFIRM_MS);
@@ -254,7 +238,6 @@ export function DogSection({ slug, name, latest, recent, currentMemberName }: Do
         {ACTIONS.map((action) => {
           const value = optimistic[action.type] ?? latest[action.type];
           const busy = pendingType === action.type;
-          const confirmed = Boolean(confirmedTypes[action.type]);
           const locked = Boolean(lockedUntil[action.type]);
           return (
             <div key={action.type} className="flex flex-col gap-1.5">
@@ -272,7 +255,7 @@ export function DogSection({ slug, name, latest, recent, currentMemberName }: Do
                   aria-hidden="true"
                   className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/20 text-lg leading-none"
                 >
-                  {confirmed ? <CheckIcon /> : "+"}
+                  {locked ? <CheckIcon /> : "+"}
                 </span>
               </button>
               <p className="flex flex-wrap items-baseline gap-x-2 px-1 text-sm">
