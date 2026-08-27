@@ -7,7 +7,7 @@ import { RelativeTime } from "@/components/ui/RelativeTime";
 import { EmptyWell } from "@/components/ui/Card";
 import { Check } from "@/components/ui/icons";
 import { relativeTime } from "@/lib/time";
-import { addShoppingItem, deleteShoppingItem, setPickedUp } from "./actions";
+import { addShoppingItem, confirmPickedUp, deleteShoppingItem, setPickedUp } from "./actions";
 
 export type Row = {
   id: string;
@@ -41,6 +41,9 @@ export function ShoppingClient({
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   // Names added this render pass, shown instantly before the server catches up.
   const [pending, setPending] = useState<string[]>([]);
+  // Items checked but not yet confirmed with "Got it".
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [confirming, setConfirming] = useState(false);
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -71,6 +74,35 @@ export function ShoppingClient({
       const result = await setPickedUp(row.id, next);
       setBusyId(null);
       if (result.ok) {
+        router.refresh();
+      } else {
+        toast(result.error, "error");
+      }
+    });
+  }
+
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  // Filtered against `open` (not just the raw Set) so a stale id left over
+  // from a deleted item can't be sent to the server or inflate the count.
+  const selected = open.filter((row) => selectedIds.has(row.id));
+
+  function confirmSelected() {
+    if (selected.length === 0 || confirming) return;
+    setConfirming(true);
+    startTransition(async () => {
+      const result = await confirmPickedUp(selected.map((row) => row.id));
+      setConfirming(false);
+      if (result.ok) {
+        toast(selected.length > 1 ? `Got it — ${selected.length} items` : "Got it");
+        setSelectedIds(new Set());
         router.refresh();
       } else {
         toast(result.error, "error");
@@ -125,10 +157,15 @@ export function ShoppingClient({
               <div className="flex items-center gap-3 p-3">
                 <button
                   type="button"
-                  aria-label={`Mark ${row.name} picked up`}
-                  disabled={busyId === row.id}
-                  onClick={() => togglePicked(row, true)}
-                  className="tap flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-line-strong text-transparent transition-colors active:bg-subtle disabled:opacity-50"
+                  role="checkbox"
+                  aria-checked={selectedIds.has(row.id)}
+                  aria-label={selectedIds.has(row.id) ? `Deselect ${row.name}` : `Select ${row.name}`}
+                  onClick={() => toggleSelected(row.id)}
+                  className={`tap flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors ${
+                    selectedIds.has(row.id)
+                      ? "bg-ink text-paper"
+                      : "border border-line-strong text-transparent active:bg-subtle"
+                  }`}
                 >
                   <Check />
                 </button>
@@ -185,6 +222,17 @@ export function ShoppingClient({
           ))}
         </ul>
       )}
+
+      {selected.length > 0 ? (
+        <button
+          type="button"
+          onClick={confirmSelected}
+          disabled={confirming}
+          className="tap mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-ink px-4 py-3.5 text-[0.9375rem] font-extrabold tracking-tight text-paper transition active:scale-[0.99] disabled:opacity-40"
+        >
+          {confirming ? "Marking…" : `Got it · ${selected.length}`}
+        </button>
+      ) : null}
 
       {pickedUp.length > 0 ? (
         <div className="mt-8">

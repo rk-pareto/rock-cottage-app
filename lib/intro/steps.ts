@@ -75,7 +75,7 @@ export function introSteps(dogsLabel: string): IntroStep[] {
       target: "nav-more",
       label: "Under More",
       title: "Public Goods",
-      body: "The shared stuff you're bringing — oil and spices, drinks, board games, paper towels, the kayak. Claim yours so we don't end up with four bottles of mustard, then tick it off once it's packed.",
+      body: "The shared stuff you're bringing — oil and spices, drinks, board games, paper towels, the kayak. Claim yours so we don't end up with four bottles of mustard.",
     },
   ];
 }

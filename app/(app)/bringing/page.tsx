@@ -24,7 +24,6 @@ export default async function BringingPage() {
           notes: r.notes,
           responsibleMemberId: r.responsibleMemberId,
           responsibleBy: r.responsibleBy,
-          packed: r.packedAt !== null,
         }))}
         currentMemberId={member.id}
         isAdmin={member.isAdmin}

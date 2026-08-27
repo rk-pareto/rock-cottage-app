@@ -109,24 +109,6 @@ export async function updateBringingItem(
   return { ok: true };
 }
 
-export async function setPacked(itemId: string, packed: boolean): Promise<ActionResult> {
-  const owned = await requireOwnedItem(itemId);
-  if (owned.error !== undefined) return fail(owned.error);
-
-  try {
-    await db
-      .update(bringingItems)
-      .set({ packedAt: packed ? new Date() : null, updatedAt: new Date() })
-      .where(eq(bringingItems.id, owned.id));
-  } catch (error) {
-    console.error("setPacked failed", error);
-    return fail("Couldn't update that. Try again.");
-  }
-
-  revalidatePath("/bringing");
-  return { ok: true };
-}
-
 export async function deleteBringingItem(itemId: string): Promise<ActionResult> {
   const owned = await requireOwnedItem(itemId);
   if (owned.error !== undefined) return fail(owned.error);

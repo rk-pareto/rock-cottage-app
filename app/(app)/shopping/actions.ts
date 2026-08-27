@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { z } from "zod";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { shoppingItems } from "@/db/schema";
 import { requireMember } from "@/lib/auth/membership";
@@ -70,6 +71,38 @@ export async function setPickedUp(itemId: string, pickedUp: boolean): Promise<Ac
   } catch (error) {
     console.error("setPickedUp failed", error);
     return fail("Couldn't update that item. Try again.");
+  }
+
+  revalidate();
+  return { ok: true };
+}
+
+/**
+ * Batch pickup confirmation — the "Got it" button. Marks every selected open
+ * item picked up by the session member in one stroke, all sharing the same
+ * timestamp so Home can group them into a single activity tile.
+ */
+export async function confirmPickedUp(itemIds: string[]): Promise<ActionResult> {
+  let member;
+  try {
+    member = await requireMember();
+  } catch {
+    return fail("You're signed out. Sign in and try again.");
+  }
+
+  const parsed = z.array(uuidSchema).min(1).safeParse(itemIds);
+  if (!parsed.success) return fail("Nothing was selected.");
+
+  try {
+    const updated = await db
+      .update(shoppingItems)
+      .set({ pickedUpAt: new Date(), pickedUpByMemberId: member.id })
+      .where(and(inArray(shoppingItems.id, parsed.data), isNull(shoppingItems.pickedUpAt)))
+      .returning({ id: shoppingItems.id });
+    if (updated.length === 0) return fail("Those items are gone.");
+  } catch (error) {
+    console.error("confirmPickedUp failed", error);
+    return fail("Couldn't update those items. Try again.");
   }
 
   revalidate();

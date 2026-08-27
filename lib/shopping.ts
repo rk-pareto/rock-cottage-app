@@ -1,6 +1,6 @@
 import "server-only";
 import { alias } from "drizzle-orm/pg-core";
-import { asc, desc, isNotNull, isNull } from "drizzle-orm";
+import { and, asc, desc, gt, isNotNull, isNull } from "drizzle-orm";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { members, shoppingItems } from "@/db/schema";
@@ -53,4 +53,41 @@ export async function countOpenShoppingItems(): Promise<number> {
     .from(shoppingItems)
     .where(isNull(shoppingItems.pickedUpAt));
   return rows.length;
+}
+
+export type PickupActivity = {
+  pickedUpAt: Date;
+  pickedUpBy: string;
+  items: string[];
+};
+
+/**
+ * Recent town runs, for the Home activity tile. A "Got it" batch confirm
+ * writes one shared timestamp across every item it touches, so grouping by
+ * (picker, exact timestamp) recovers each trip as a single entry — no
+ * separate activity-log table needed (spec §43).
+ */
+export async function getRecentPickupActivity(
+  windowHours = 24,
+  limit = 3,
+): Promise<PickupActivity[]> {
+  const cutoff = new Date(Date.now() - windowHours * 60 * 60 * 1000);
+  const rows = await baseQuery()
+    .where(and(isNotNull(shoppingItems.pickedUpAt), gt(shoppingItems.pickedUpAt, cutoff)))
+    .orderBy(desc(shoppingItems.pickedUpAt));
+
+  const groups = new Map<string, PickupActivity>();
+  const order: string[] = [];
+  for (const row of rows) {
+    if (!row.pickedUpAt || !row.pickedUpBy) continue;
+    const key = `${row.pickedUpBy}:${row.pickedUpAt.getTime()}`;
+    let group = groups.get(key);
+    if (!group) {
+      group = { pickedUpAt: row.pickedUpAt, pickedUpBy: row.pickedUpBy, items: [] };
+      groups.set(key, group);
+      order.push(key);
+    }
+    group.items.push(row.name);
+  }
+  return order.slice(0, limit).map((key) => groups.get(key)!);
 }

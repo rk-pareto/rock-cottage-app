@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   description: "Meals, Alice, shopping and memories from the week at the cottage.",
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, statusBarStyle: "default", title: "Rock Cottage" },
-  icons: { icon: "/icon.svg", apple: "/apple-icon.png" },
+  icons: { icon: "/icon-192.png", apple: "/apple-icon.png" },
 };
 
 export const viewport: Viewport = {

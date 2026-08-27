@@ -4,14 +4,8 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import { EmptyWell } from "@/components/ui/Card";
-import { Check } from "@/components/ui/icons";
 import { BRINGING_CATEGORIES, BRINGING_CATEGORY_INFO, type BringingCategory } from "@/lib/bringingCategories";
-import {
-  addBringingItem,
-  deleteBringingItem,
-  setPacked,
-  updateBringingItem,
-} from "./actions";
+import { addBringingItem, deleteBringingItem, updateBringingItem } from "./actions";
 
 export type Row = {
   id: string;
@@ -20,7 +14,6 @@ export type Row = {
   notes: string | null;
   responsibleMemberId: string;
   responsibleBy: string;
-  packed: boolean;
 };
 
 export function BringingClient({
@@ -88,14 +81,6 @@ export function BringingClient({
     setCategory(row.category);
     setNotes(row.notes ?? "");
     setShowAdd(true);
-  }
-
-  function togglePacked(row: Row) {
-    startTransition(async () => {
-      const result = await setPacked(row.id, !row.packed);
-      if (result.ok) router.refresh();
-      else toast(result.error, "error");
-    });
   }
 
   function remove(row: Row) {
@@ -211,37 +196,8 @@ export function BringingClient({
                 {items.map((row) => (
                   <li key={row.id} className="border-b border-line bg-card last:border-b-0">
                     <div className="flex items-center gap-3 p-3">
-                      {canEdit(row) ? (
-                        <button
-                          type="button"
-                          aria-label={row.packed ? `Unmark ${row.name} packed` : `Mark ${row.name} packed`}
-                          onClick={() => togglePacked(row)}
-                          className={`tap flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors ${
-                            row.packed
-                              ? "bg-pine text-white"
-                              : "border border-line-strong text-transparent active:bg-subtle"
-                          }`}
-                        >
-                          <Check />
-                        </button>
-                      ) : (
-                        <div
-                          aria-hidden="true"
-                          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${
-                            row.packed
-                              ? "bg-pine/12 text-pine"
-                              : "border border-line-strong text-transparent"
-                          }`}
-                        >
-                          <Check />
-                        </div>
-                      )}
                       <div className="min-w-0 flex-1">
-                        <p
-                          className={`truncate text-[0.9375rem] font-bold ${row.packed ? "text-muted line-through" : "text-ink"}`}
-                        >
-                          {row.name}
-                        </p>
+                        <p className="truncate text-[0.9375rem] font-bold text-ink">{row.name}</p>
                         <p className="truncate text-xs text-muted">
                           {row.responsibleBy}
                           {row.notes ? ` · ${row.notes}` : ""}

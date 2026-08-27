@@ -21,7 +21,7 @@ import {
   type MealRow,
 } from "@/lib/meals";
 import { formatDuration, getReadyMemories, withThumbnailUrls } from "@/lib/memories";
-import { getOpenShoppingItems } from "@/lib/shopping";
+import { getOpenShoppingItems, getRecentPickupActivity, type PickupActivity } from "@/lib/shopping";
 import { formatStayTime, stayEventsFor, type StayEvent } from "@/lib/stay";
 import { isStorageConfigured } from "@/lib/storage/s3";
 import {
@@ -58,11 +58,12 @@ export default async function HomePage() {
   const storageReady = isStorageConfigured();
 
   // Home queries the source tables directly — no activity-feed system (spec §43).
-  const [meals, confirmations, dogs, shopping, memoryPool] = await Promise.all([
+  const [meals, confirmations, dogs, shopping, pickups, memoryPool] = await Promise.all([
     getUpcomingMeals(5),
     getMealsAwaitingConfirmation(member.id),
     getDogStatuses(),
     getOpenShoppingItems(),
+    getRecentPickupActivity(),
     storageReady ? getReadyMemories(MEMORY_POOL) : Promise.resolve([]),
   ]);
 
@@ -110,6 +111,19 @@ export default async function HomePage() {
                 sharedWith: coCooks(meal, member.id),
               }}
             />
+          ))}
+        </section>
+      ) : null}
+
+      {/* Recent town runs — keeps everyone posted on what just got picked up
+          without a generic activity-feed system (spec §43): it's read
+          straight off shopping_items, grouped by the shared timestamp a
+          "Got it" batch confirm stamps across its items. */}
+      {pickups.length > 0 ? (
+        <section className="flex flex-col gap-3">
+          <SectionLabel href="/shopping">From town</SectionLabel>
+          {pickups.map((pickup) => (
+            <PickupActivityTile key={`${pickup.pickedUpBy}-${pickup.pickedUpAt.toISOString()}`} pickup={pickup} />
           ))}
         </section>
       ) : null}
@@ -349,6 +363,35 @@ function StayTile({ stay }: { stay: StayEvent }) {
             {formatStayTime(stay)}
           </span>
           .
+        </p>
+      </div>
+    </Link>
+  );
+}
+
+/**
+ * A single town run pulled straight off `shopping_items` — one tile per
+ * distinct (picker, timestamp) group from {@link getRecentPickupActivity}.
+ * Shaped like {@link StayTile} but pine, since that's already the "picked up"
+ * color on the Shopping screen.
+ */
+function PickupActivityTile({ pickup }: { pickup: PickupActivity }) {
+  return (
+    <Link
+      href="/shopping"
+      className="block overflow-hidden rounded-2xl border border-line bg-card shadow-[0_1px_1px_rgba(14,18,22,0.03)] transition-colors active:bg-subtle"
+    >
+      <div className="border-l-[3px] border-pine p-4">
+        <p className="label text-pine">Picked up from town</p>
+        <h3 className="mt-2 font-display text-[1.5rem] leading-tight text-ink">
+          {pickup.items.join(", ")}
+        </h3>
+        <p className="mt-1.5 text-sm leading-relaxed text-muted">
+          <span className="font-bold text-ink-soft">{pickup.pickedUpBy}</span>{" "}
+          <RelativeTime
+            iso={pickup.pickedUpAt.toISOString()}
+            initial={relativeTime(pickup.pickedUpAt)}
+          />
         </p>
       </div>
     </Link>

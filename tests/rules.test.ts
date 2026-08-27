@@ -32,7 +32,7 @@ vi.mock("@/lib/auth/membership", () => ({
 const { addShoppingItem, deleteShoppingItem, setPickedUp } = await import(
   "@/app/(app)/shopping/actions"
 );
-const { addBringingItem, deleteBringingItem, setPacked, updateBringingItem } = await import(
+const { addBringingItem, deleteBringingItem, updateBringingItem } = await import(
   "@/app/(app)/bringing/actions"
 );
 const { recordPetEvent, deletePetEvent, updatePetEventTime } = await import(
@@ -209,7 +209,7 @@ describe("bringing", () => {
     expect(row!.category).toBe("cooking");
   });
 
-  it("lets the owner edit and pack, but blocks another member", async () => {
+  it("lets the owner edit and delete, but blocks another member", async () => {
     currentMember = alice;
     await addBringingItem({ name: "Test Mustard", category: "cooking" });
     const [item] = await db
@@ -222,22 +222,15 @@ describe("bringing", () => {
     expect(
       await updateBringingItem(item!.id, { name: "Hijacked", category: "cooking" }),
     ).toMatchObject({ ok: false });
-    expect(await setPacked(item!.id, true)).toMatchObject({ ok: false });
     expect(await deleteBringingItem(item!.id)).toMatchObject({ ok: false });
 
     currentMember = alice;
     expect(
       await updateBringingItem(item!.id, { name: "Test Dijon", category: "cooking" }),
     ).toEqual({ ok: true });
-    expect(await setPacked(item!.id, true)).toEqual({ ok: true });
 
-    const [packed] = await db.select().from(bringingItems).where(eq(bringingItems.id, item!.id));
-    expect(packed!.name).toBe("Test Dijon");
-    expect(packed!.packedAt).toBeInstanceOf(Date);
-
-    expect(await setPacked(item!.id, false)).toEqual({ ok: true });
-    const [unpacked] = await db.select().from(bringingItems).where(eq(bringingItems.id, item!.id));
-    expect(unpacked!.packedAt).toBeNull();
+    const [renamed] = await db.select().from(bringingItems).where(eq(bringingItems.id, item!.id));
+    expect(renamed!.name).toBe("Test Dijon");
 
     expect(await deleteBringingItem(item!.id)).toEqual({ ok: true });
   });
