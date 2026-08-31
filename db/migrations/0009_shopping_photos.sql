@@ -1,0 +1,1 @@
+ALTER TABLE "shopping_items" ADD COLUMN "photo_key" text;

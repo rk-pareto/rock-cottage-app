@@ -64,6 +64,13 @@
       "when": 1788138794121,
       "tag": "0008_feed_posts",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1788208610840,
+      "tag": "0009_shopping_photos",
+      "breakpoints": true
     }
   ]
 }

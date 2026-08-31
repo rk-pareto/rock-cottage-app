@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFile } from "node:fs/promises";
 import sharp from "sharp";
-import { processImage, toShareableJpeg } from "@/lib/storage/process";
+import { compressPhoto, processImage, toShareableJpeg } from "@/lib/storage/process";
 
 /**
  * The formats phones actually produce. HEIC matters most — it is the iPhone
@@ -80,6 +80,45 @@ describe("image processing", () => {
 
   it("rejects a file that isn't an image at all", async () => {
     await expect(processImage(Buffer.from("this is not an image"))).rejects.toThrow();
+  });
+});
+
+describe("compressed-only photos", () => {
+  it("produces one small WebP and clamps the long edge", async () => {
+    const result = await compressPhoto(await makeImage("jpeg", 3200, 2400));
+    const meta = await sharp(result.buffer).metadata();
+
+    expect(result.contentType).toBe("image/webp");
+    expect(meta.format).toBe("webp");
+    expect(Math.max(meta.width!, meta.height!)).toBe(1280);
+    expect(meta.width! / meta.height!).toBeCloseTo(3200 / 2400, 2);
+  });
+
+  it("never enlarges a photo that is already small", async () => {
+    const result = await compressPhoto(await makeImage("jpeg", 400, 300));
+    const meta = await sharp(result.buffer).metadata();
+    expect(meta.width).toBe(400);
+    expect(meta.height).toBe(300);
+  });
+
+  it("is markedly smaller than the memory display copy of the same shot", async () => {
+    const original = await makeImage("jpeg", 3200, 2400);
+    const { display } = await processImage(original);
+    const compact = await compressPhoto(original);
+    expect(compact.buffer.byteLength).toBeLessThan(display.buffer.byteLength);
+  });
+
+  it("handles the HEIC an iPhone actually sends", async () => {
+    const heic = await readFile("tests/fixtures/iphone-sample.heic");
+    const result = await compressPhoto(heic);
+    expect((await sharp(result.buffer).metadata()).format).toBe("webp");
+  });
+
+  it("leaves the original buffer untouched", async () => {
+    const original = await makeImage("jpeg");
+    const before = Buffer.from(original);
+    await compressPhoto(original);
+    expect(original.equals(before)).toBe(true);
   });
 });
 

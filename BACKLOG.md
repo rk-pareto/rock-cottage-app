@@ -40,3 +40,4 @@ A living backlog of ideas, feature requests, bug fixes, and polish items for the
 - [x] Video transcoding — server-made H.264/AAC playback copy so HEVC clips play everywhere
 - [x] Feed posts — anyone can pin a text/photo/video message to the top of Home; per-member dismiss, author/admin delete for everyone
 - [x] AI meal descriptions — renaming a meal regenerates its fancy description via Ollama's cloud API
+- [x] Shopping list photos — attach one compressed photo to an item so people can see which one you mean

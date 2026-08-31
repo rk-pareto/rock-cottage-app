@@ -98,3 +98,22 @@ export function HeartGlyph({
     </svg>
   );
 }
+
+/** A camera body with its lens — "put a picture on this". */
+export function CameraGlyph({ className = "h-5 w-5" }: { className?: string } = {}) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M3 8.5A1.5 1.5 0 0 1 4.5 7h2.2l1.1-2h8.4l1.1 2h2.2A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z" />
+      <circle cx="12" cy="13" r="3.4" />
+    </svg>
+  );
+}

@@ -248,3 +248,51 @@ export async function uploadMedia(
     return { ok: false, message };
   }
 }
+
+/**
+ * Attach a photo to a shopping item: intent → direct PUT → compress.
+ *
+ * Deliberately *not* {@link uploadMedia}. That pipeline creates a `media` row,
+ * which is what puts a file in Memories and keeps its original forever — and
+ * a snapshot of the right brand of coffee is neither a memory nor something
+ * anyone wants at full resolution. This one leaves nothing behind but the
+ * compressed copy the list shows.
+ */
+export async function uploadShoppingPhoto(
+  itemId: string,
+  file: File,
+  onProgress?: (patch: { stage: "uploading" | "processing"; progress?: number }) => void,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  try {
+    const contentType = file.type || guessContentType(file.name);
+
+    const intentResponse = await fetch(`/api/shopping/${itemId}/photo-intent`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ contentType, bytes: file.size }),
+    });
+
+    if (!intentResponse.ok) {
+      const body = await intentResponse.json().catch(() => ({}));
+      return { ok: false, message: body.error ?? "That photo couldn't be uploaded." };
+    }
+
+    const { uploadUrl } = (await intentResponse.json()) as { uploadUrl: string };
+
+    const uploaded = await putToBucket(uploadUrl, file, contentType, (progress) =>
+      onProgress?.({ stage: "uploading", progress }),
+    );
+    if (!uploaded) return { ok: false, message: "The upload didn't finish." };
+
+    onProgress?.({ stage: "processing" });
+    const completeResponse = await fetch(`/api/shopping/${itemId}/photo`, { method: "POST" });
+    if (!completeResponse.ok) {
+      const body = await completeResponse.json().catch(() => ({}));
+      return { ok: false, message: body.error ?? "That photo couldn't be saved." };
+    }
+
+    return { ok: true };
+  } catch {
+    return { ok: false, message: "Something went wrong. Try again." };
+  }
+}

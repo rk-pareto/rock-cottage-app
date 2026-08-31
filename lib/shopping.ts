@@ -3,7 +3,8 @@ import { alias } from "drizzle-orm/pg-core";
 import { and, asc, desc, gt, isNotNull, isNull } from "drizzle-orm";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { members, shoppingItems } from "@/db/schema";
+import { members, shoppingItems, type Member, type ShoppingItem } from "@/db/schema";
+import { presignView } from "@/lib/storage/s3";
 
 export type ShoppingRow = {
   id: string;
@@ -13,7 +14,11 @@ export type ShoppingRow = {
   requestedByMemberId: string;
   pickedUpAt: Date | null;
   pickedUpBy: string | null;
+  photoKey: string | null;
 };
+
+/** A row ready for the screen: the photo resolved to a URL a browser can load. */
+export type ShoppingCard = ShoppingRow & { photoUrl: string | null };
 
 const picker = alias(members, "picker");
 
@@ -27,6 +32,7 @@ function baseQuery() {
       requestedByMemberId: shoppingItems.requestedByMemberId,
       pickedUpAt: shoppingItems.pickedUpAt,
       pickedUpBy: picker.displayName,
+      photoKey: shoppingItems.photoKey,
     })
     .from(shoppingItems)
     .innerJoin(members, eq(members.id, shoppingItems.requestedByMemberId))
@@ -45,6 +51,42 @@ export async function getPickedUpShoppingItems(limit = 50): Promise<ShoppingRow[
     .where(isNotNull(shoppingItems.pickedUpAt))
     .orderBy(desc(shoppingItems.pickedUpAt))
     .limit(limit);
+}
+
+/**
+ * Attach a short-lived presigned URL to every row that has a photo, same
+ * pattern as {@link import("./feedPosts").withPostThumbnailUrls}. The bucket
+ * is private, so this is the only way the bytes reach a browser.
+ */
+export async function withShoppingPhotoUrls(rows: ShoppingRow[]): Promise<ShoppingCard[]> {
+  return Promise.all(
+    rows.map(async (row) => ({
+      ...row,
+      photoUrl: row.photoKey ? await presignView(row.photoKey).catch(() => null) : null,
+    })),
+  );
+}
+
+/** The raw row, for the paths that must check ownership before writing. */
+export async function getShoppingItemById(itemId: string): Promise<ShoppingItem | null> {
+  const [row] = await db
+    .select()
+    .from(shoppingItems)
+    .where(eq(shoppingItems.id, itemId))
+    .limit(1);
+  return row ?? null;
+}
+
+/**
+ * Who may change an item rather than just tick it off: the person who asked
+ * for it, or an admin (spec §11.4). Deleting it and attaching a photo to it
+ * are the same question, so they ask it in the same place.
+ */
+export function canEditShoppingItem(
+  item: Pick<ShoppingItem, "requestedByMemberId">,
+  member: Pick<Member, "id" | "isAdmin">,
+): boolean {
+  return item.requestedByMemberId === member.id || member.isAdmin;
 }
 
 export async function countOpenShoppingItems(): Promise<number> {

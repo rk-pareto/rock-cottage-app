@@ -90,6 +90,25 @@ export function maxBytesFor(kind: UploadKind): number {
   return kind === "video" ? MAX_VIDEO_BYTES : MAX_PHOTO_BYTES;
 }
 
+/**
+ * What a shopping-list photo upload has to declare. Images only — there is no
+ * player on that screen, and nothing here keeps an original, so a clip would
+ * have nowhere to go. No filename either: the upload lands on one fixed
+ * scratch key derived from the item.
+ */
+export const shoppingPhotoIntentSchema = z.object({
+  contentType: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .refine((v) => kindForContentType(v) === "image", "That has to be a photo."),
+  bytes: z
+    .number()
+    .int()
+    .positive()
+    .max(MAX_PHOTO_BYTES, `That photo is larger than ${Math.round(MAX_PHOTO_BYTES / (1024 * 1024))} MB.`),
+});
+
 /** Whole positive pixels, ignored rather than rejected when a browser lies. */
 const dimensionSchema = z.number().int().positive().max(100_000).optional();
 

@@ -162,6 +162,13 @@ export const shoppingItems = pgTable(
     requestedByMemberId: uuid("requested_by_member_id")
       .notNull()
       .references(() => members.id, { onDelete: "restrict" }),
+    /**
+     * An optional photo of the thing being asked for — "this jar, not that
+     * one". Only ever the compressed WebP: the upload it was made from is
+     * deleted the moment it has been re-encoded, and no `media` row is
+     * created, so a picture of a pickle jar never turns up in Memories.
+     */
+    photoKey: text("photo_key"),
     createdAt,
     pickedUpAt: timestamp("picked_up_at", { withTimezone: true }),
     pickedUpByMemberId: uuid("picked_up_by_member_id").references(() => members.id, {

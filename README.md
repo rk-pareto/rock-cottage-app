@@ -18,7 +18,7 @@ screen.
 | Home | `/` | Feed posts from anyone, upcoming meals, your meal confirmations, Alice's status, shopping summary, recent memories |
 | Meals | `/meals` | The whole week with deeply pretentious descriptions; only the cook can rename their own |
 | Alice | `/dogs` | Three big buttons: out, pooped, fed. One tap, recorded under your name |
-| Shopping | `/shopping` | Add something, anyone can mark it picked up |
+| Shopping | `/shopping` | Add something — with a photo of it, if that's clearer — and anyone can mark it picked up |
 | Memories | `/memories` | Everyone's photos and videos; originals preserved exactly |
 | Public Goods | `/bringing` | Claim the ketchup so we don't end up with four |
 | Cottage Info | `/info` | Address, wifi, emergency — Markdown files, not a database |
@@ -307,6 +307,34 @@ An attachment goes through the exact upload pipeline `/memories` uses
 (`lib/uploads/browser.ts`, shared with the Memories screen) before the post is
 even submitted, so it's an ordinary `media` row — it shows up in `/memories`
 regardless of whether the post itself survives.
+
+---
+
+## Shopping photos
+
+A shopping item can carry one photo, so the person in the aisle can see which
+jar was meant instead of guessing from "the good mustard". It looks like the
+memory pipeline and is deliberately not it:
+
+| | Memories | Shopping photo |
+|---|---|---|
+| Original | kept forever, untouched | deleted the moment it's re-encoded |
+| Copies kept | `display.webp` 2560px + `thumbnail.webp` 640px | one WebP, 1280px, quality 72 |
+| Row created | `media` — shows up in `/memories` | none; just `shopping_items.photo_key` |
+
+1. `/api/shopping/[id]/photo-intent` presigns a PUT at one fixed scratch key
+   per item — same direct-to-bucket upload as a memory, same [CORS](#bucket-cors)
+   requirement.
+2. `/api/shopping/[id]/photo` reads it back, compresses it with
+   `compressPhoto()` (which shares the HEIC fallback described above), points
+   the row at the result, and deletes the scratch object — on failure too, so
+   raw uploads never linger.
+
+The compressed copy *is* the photo, so its key carries a timestamp: signed view
+URLs are cached for minutes, and reusing one key would keep showing the picture
+that was just replaced. Attaching, replacing and removing a photo follow the
+same ownership rule as deleting the item — the person who asked for it, or an
+admin (`canEditShoppingItem`). Deleting the item takes its photo with it.
 
 ---
 

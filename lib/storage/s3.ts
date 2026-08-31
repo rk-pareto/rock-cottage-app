@@ -148,6 +148,21 @@ export const posterKey = (memoryId: string) => `memories/${memoryId}/poster.jpg`
 export const playbackKey = (memoryId: string) => `memories/${memoryId}/playback.mp4`;
 
 /**
+ * Where a shopping item's photo lives. The stamp in the name is what makes a
+ * replacement visible: signed view URLs are cached for minutes, so reusing one
+ * key would keep showing the photo that was just swapped out.
+ */
+export const shoppingPhotoKey = (itemId: string, stamp = Date.now()) =>
+  `shopping/${itemId}/photo-${stamp}.webp`;
+
+/**
+ * The raw upload behind a shopping photo. One fixed key per item, because it
+ * is scratch space: each attempt overwrites the last, and the object is
+ * deleted as soon as the compressed copy has been written.
+ */
+export const shoppingUploadKey = (itemId: string) => `shopping/${itemId}/upload`;
+
+/**
  * Stream an object down to a local file. ffmpeg needs seekable input for an
  * MP4/MOV, and a clip is far too big to hold in the container's memory just to
  * get it onto disk (spec §14 memory discipline).

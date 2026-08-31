@@ -16,6 +16,14 @@ const THUMBNAIL_QUALITY = 78;
 const SHARE_QUALITY = 88;
 
 /**
+ * A shopping-list photo only has to answer "which one did you mean?" on a
+ * phone held in a supermarket aisle, so it is kept deliberately small — no
+ * original, no second variant, nothing to archive.
+ */
+const COMPACT_MAX_EDGE = 1280;
+const COMPACT_QUALITY = 72;
+
+/**
  * Full-resolution decodes are memory-hungry and a phone can fire several
  * uploads at once. Serialise them so a burst can't exhaust the Railway
  * container (spec §14.5).
@@ -113,22 +121,32 @@ async function decodeHeif(
 }
 
 /**
- * Build the display and thumbnail variants. The original buffer is only ever
- * read — it is never written back (spec §14.2).
+ * Hand `render` a way to open the original as a fresh sharp pipeline, falling
+ * back to a libheif decode when sharp itself can't read the file. Everything
+ * that touches an upload goes through here, so HEIC works everywhere rather
+ * than only on the path that happened to be written first.
+ *
+ * The original buffer is only ever read — it is never written back (spec §14.2).
  */
-export function processImage(original: Buffer): Promise<ProcessedImage> {
+function withImagePipeline<T>(
+  original: Buffer,
+  render: (
+    makePipeline: () => Sharp,
+    knownSize?: { width: number; height: number },
+  ) => Promise<T>,
+): Promise<T> {
   return withConcurrencyLimit(async () => {
     try {
       // `failOn: "none"` keeps slightly malformed phone images usable rather
       // than failing the whole upload.
-      return await renderVariants(() => sharp(original, { failOn: "none" }).rotate());
+      return await render(() => sharp(original, { failOn: "none" }).rotate());
     } catch (error) {
       const raw = await decodeHeif(original);
       if (!raw) throw error;
 
       // libheif already applies the image's rotation, and raw pixels carry no
       // EXIF, so no .rotate() here.
-      return renderVariants(
+      return render(
         () =>
           sharp(raw.data, {
             raw: { width: raw.width, height: raw.height, channels: 4 },
@@ -137,6 +155,32 @@ export function processImage(original: Buffer): Promise<ProcessedImage> {
       );
     }
   });
+}
+
+/** Build the display and thumbnail variants for a memory. */
+export function processImage(original: Buffer): Promise<ProcessedImage> {
+  return withImagePipeline(original, renderVariants);
+}
+
+/**
+ * Squash an upload down to one modest WebP and nothing else — the whole of
+ * what a shopping-list photo ever is. The caller throws the upload away once
+ * this comes back, so there is no original to fall back on and no derivative
+ * chain to keep in step.
+ */
+export function compressPhoto(original: Buffer): Promise<Derivative> {
+  return withImagePipeline(original, async (makePipeline) => ({
+    buffer: await makePipeline()
+      .resize({
+        width: COMPACT_MAX_EDGE,
+        height: COMPACT_MAX_EDGE,
+        fit: "inside",
+        withoutEnlargement: true,
+      })
+      .webp({ quality: COMPACT_QUALITY })
+      .toBuffer(),
+    contentType: "image/webp",
+  }));
 }
 
 /**

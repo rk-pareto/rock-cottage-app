@@ -6,11 +6,18 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { shoppingItems } from "@/db/schema";
 import { requireMember } from "@/lib/auth/membership";
+import { canEditShoppingItem, getShoppingItemById } from "@/lib/shopping";
+import { deleteObjects, shoppingUploadKey } from "@/lib/storage/s3";
 import { itemNameSchema, uuidSchema } from "@/lib/validation/schemas";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
-function fail(error: string): ActionResult {
+/** Adding gives the id back, because a photo is attached to the item straight
+ *  afterwards and the browser has to know what it just created. */
+export type AddResult = { ok: true; itemId: string } | { ok: false; error: string };
+
+/** Typed as the failure arm alone, so it satisfies every result shape here. */
+function fail(error: string): { ok: false; error: string } {
   return { ok: false, error };
 }
 
@@ -20,7 +27,7 @@ function revalidate() {
 }
 
 /** Requester is always the session member — never taken from the browser. */
-export async function addShoppingItem(name: string): Promise<ActionResult> {
+export async function addShoppingItem(name: string): Promise<AddResult> {
   let member;
   try {
     member = await requireMember();
@@ -31,18 +38,80 @@ export async function addShoppingItem(name: string): Promise<ActionResult> {
   const parsed = itemNameSchema.safeParse(name);
   if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "That name isn't valid.");
 
+  let itemId: string;
   try {
-    await db.insert(shoppingItems).values({
-      name: parsed.data,
-      requestedByMemberId: member.id,
-    });
+    const [row] = await db
+      .insert(shoppingItems)
+      .values({
+        name: parsed.data,
+        requestedByMemberId: member.id,
+      })
+      .returning({ id: shoppingItems.id });
+    if (!row) return fail(`Couldn't add ${parsed.data}. Try again.`);
+    itemId = row.id;
   } catch (error) {
     console.error("addShoppingItem failed", error);
     return fail(`Couldn't add ${parsed.data}. Try again.`);
   }
 
   revalidate();
+  return { ok: true, itemId };
+}
+
+/**
+ * Take the photo back off an item, leaving the item itself alone. Same
+ * ownership rule as deleting it — see {@link canEditShoppingItem}.
+ */
+export async function removeShoppingPhoto(itemId: string): Promise<ActionResult> {
+  let member;
+  try {
+    member = await requireMember();
+  } catch {
+    return fail("You're signed out. Sign in and try again.");
+  }
+
+  const parsed = uuidSchema.safeParse(itemId);
+  if (!parsed.success) return fail("That item isn't valid.");
+
+  const item = await getShoppingItemById(parsed.data);
+  if (!item) return fail("That item is gone.");
+  if (!canEditShoppingItem(item, member)) {
+    return fail("You can only change photos on items you added.");
+  }
+  if (!item.photoKey) return { ok: true };
+
+  try {
+    await db
+      .update(shoppingItems)
+      .set({ photoKey: null })
+      .where(eq(shoppingItems.id, item.id));
+  } catch (error) {
+    console.error("removeShoppingPhoto failed", error);
+    return fail("Couldn't remove that photo. Try again.");
+  }
+
+  await cleanUpPhoto(item.id, item.photoKey);
+  revalidate();
   return { ok: true };
+}
+
+/**
+ * Best-effort bucket tidying, always after the row has been written: an
+ * orphaned object is a smaller problem than a list entry whose photo has
+ * vanished, and a failure here must never be reported as a failed action.
+ *
+ * An item that never had a photo has nothing to chase, and most of them
+ * haven't — so that case costs no bucket round trip at all.
+ */
+async function cleanUpPhoto(itemId: string, photoKey: string | null) {
+  if (!photoKey) return;
+  try {
+    // The scratch upload goes too: if a phone died between PUT and processing,
+    // this is the only thing that would ever come back for it.
+    await deleteObjects([photoKey, shoppingUploadKey(itemId)]);
+  } catch (error) {
+    console.error("shopping photo cleanup failed", itemId, error);
+  }
 }
 
 /** Any member may mark any open item picked up (spec §11.3). */
@@ -121,14 +190,9 @@ export async function deleteShoppingItem(itemId: string): Promise<ActionResult> 
   const parsed = uuidSchema.safeParse(itemId);
   if (!parsed.success) return fail("That item isn't valid.");
 
-  const [item] = await db
-    .select({ requestedByMemberId: shoppingItems.requestedByMemberId })
-    .from(shoppingItems)
-    .where(eq(shoppingItems.id, parsed.data))
-    .limit(1);
-
+  const item = await getShoppingItemById(parsed.data);
   if (!item) return fail("That item is gone.");
-  if (item.requestedByMemberId !== member.id && !member.isAdmin) {
+  if (!canEditShoppingItem(item, member)) {
     return fail("You can only delete items you added.");
   }
 
@@ -139,6 +203,7 @@ export async function deleteShoppingItem(itemId: string): Promise<ActionResult> 
     return fail("Couldn't delete that. Try again.");
   }
 
+  await cleanUpPhoto(item.id, item.photoKey);
   revalidate();
   return { ok: true };
 }

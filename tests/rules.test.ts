@@ -29,7 +29,7 @@ vi.mock("@/lib/auth/membership", () => ({
     currentMember ? { state: "member", member: currentMember } : { state: "unauthenticated" },
 }));
 
-const { addShoppingItem, deleteShoppingItem, setPickedUp } = await import(
+const { addShoppingItem, deleteShoppingItem, removeShoppingPhoto, setPickedUp } = await import(
   "@/app/(app)/shopping/actions"
 );
 const { addBringingItem, deleteBringingItem, updateBringingItem } = await import(
@@ -125,7 +125,7 @@ describe("authorization", () => {
 describe("shopping", () => {
   it("attributes the request to the session member, not the client", async () => {
     currentMember = alice;
-    expect(await addShoppingItem("  Test Milk  ")).toEqual({ ok: true });
+    expect(await addShoppingItem("  Test Milk  ")).toMatchObject({ ok: true });
 
     const open = await getOpenShoppingItems();
     const row = open.find((r) => r.name === "Test Milk");
@@ -180,6 +180,62 @@ describe("shopping", () => {
       .from(shoppingItems)
       .where(eq(shoppingItems.id, item!.id));
     expect(remaining).toHaveLength(0);
+  });
+
+  it("hands back the new item's id, so a photo can be attached to it", async () => {
+    currentMember = alice;
+    const result = await addShoppingItem("Test Photo Target");
+    expect(result.ok).toBe(true);
+
+    const [item] = await db
+      .select()
+      .from(shoppingItems)
+      .where(eq(shoppingItems.name, "Test Photo Target"))
+      .limit(1);
+    expect(result.ok && result.itemId).toBe(item!.id);
+    // Nothing is attached until the compressed copy has actually been written.
+    expect(item!.photoKey).toBeNull();
+  });
+
+  it("lets the requester and an admin remove a photo, but not another member", async () => {
+    currentMember = alice;
+    await addShoppingItem("Test Photo Owner");
+    const [item] = await db
+      .select()
+      .from(shoppingItems)
+      .where(eq(shoppingItems.name, "Test Photo Owner"))
+      .limit(1);
+
+    // Stand in for a finished upload — the processing route is what normally
+    // writes this, and it has already checked the same rule to get here.
+    const attach = () =>
+      db
+        .update(shoppingItems)
+        .set({ photoKey: `shopping/${item!.id}/photo-1.webp` })
+        .where(eq(shoppingItems.id, item!.id));
+    await attach();
+
+    currentMember = bob;
+    expect(await removeShoppingPhoto(item!.id)).toMatchObject({ ok: false });
+    const [untouched] = await db
+      .select()
+      .from(shoppingItems)
+      .where(eq(shoppingItems.id, item!.id));
+    expect(untouched!.photoKey).not.toBeNull();
+
+    currentMember = alice;
+    expect(await removeShoppingPhoto(item!.id)).toEqual({ ok: true });
+    const [cleared] = await db
+      .select()
+      .from(shoppingItems)
+      .where(eq(shoppingItems.id, item!.id));
+    expect(cleared!.photoKey).toBeNull();
+    // The item itself survives losing its picture.
+    expect(cleared!.name).toBe("Test Photo Owner");
+
+    await attach();
+    currentMember = admin;
+    expect(await removeShoppingPhoto(item!.id)).toEqual({ ok: true });
   });
 
   it("lets an admin delete someone else's item", async () => {
