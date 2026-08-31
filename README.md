@@ -182,6 +182,8 @@ or shares is a derived copy alongside it.
 
 1. Client asks `/api/memories/upload-intent` for a presigned PUT.
 2. Browser uploads the original **straight to the bucket**, not through Next.
+   That PUT is cross-origin and carries a real `content-type`, so the browser
+   preflights it — see [Bucket CORS](#bucket-cors) below.
 3. `/api/memories/[id]/complete` reads it back and generates:
    - `display.webp` — longest edge 2560px
    - `thumbnail.webp` — longest edge 640px
@@ -262,6 +264,34 @@ byte-identically, and asserts an unsigned URL is rejected.
 
 New objects land under `memories/`; anything uploaded before the rename still
 lives under `photos/` and is found by the key stored on its row.
+
+### Bucket CORS
+
+A new bucket has no CORS rules, and a bucket with no CORS rules answers the
+uploader's preflight with `403 AccessForbidden` — every upload then fails
+before a byte moves, while `/upload-intent` still returns a healthy 200. Each
+environment gets its own bucket, so this is a one-time step per environment:
+
+```bash
+railway run npm run bucket:cors
+```
+
+`scripts/bucket-cors.ts` allows `APP_URL`, `RAILWAY_PUBLIC_DOMAIN` and
+`localhost:3000`; it replaces the whole policy, so re-run it after adding a
+domain.
+
+Once a custom domain is attached, every Railway variable reports *it* — the
+generated `*.up.railway.app` domain keeps serving while appearing in no
+variable at all. Any second serving domain therefore has to be named in
+`BUCKET_CORS_EXTRA_ORIGINS` (comma-separated) or it silently loses the ability
+to upload. Check what a bucket currently allows with:
+
+```bash
+curl -si -X OPTIONS "https://$BUCKET_NAME.t3.storageapi.dev/probe" \
+  -H "Origin: https://cottage.krook.io" \
+  -H "Access-Control-Request-Method: PUT" \
+  -H "Access-Control-Request-Headers: content-type"
+```
 
 ---
 

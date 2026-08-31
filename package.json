@@ -12,6 +12,7 @@
     "db:push": "drizzle-kit push",
     "db:seed": "tsx db/seed/index.ts",
     "db:studio": "drizzle-kit studio",
+    "bucket:cors": "tsx scripts/bucket-cors.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
