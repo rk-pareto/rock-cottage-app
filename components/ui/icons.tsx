@@ -40,6 +40,23 @@ export function MutedGlyph({ className = "" }: { className?: string }) {
   );
 }
 
+/** A plain X — dismiss, cancel, close. */
+export function CloseGlyph({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2.2}
+      strokeLinecap="round"
+    >
+      <path d="M6 6l12 12M18 6 6 18" />
+    </svg>
+  );
+}
+
 /** Points left by default; rotate 180° for a "next" arrow. */
 export function ChevronGlyph({ className = "" }: { className?: string }) {
   return (

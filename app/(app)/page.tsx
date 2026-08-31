@@ -6,8 +6,10 @@ import { Card, EmptyState, SectionLabel } from "@/components/ui/Card";
 import { RelativeTime } from "@/components/ui/RelativeTime";
 import { FeedLightboxProvider, type FeedLightboxItem } from "@/components/memories/FeedLightbox";
 import { FeedPhotoCarousel } from "@/components/memories/FeedPhotoCarousel";
+import { FeedPostsSection } from "@/components/feed/FeedPostsSection";
 import { requireMember } from "@/lib/auth/membership";
 import { getDogStatuses } from "@/lib/dogs";
+import { getActiveFeedPosts, withPostThumbnailUrls } from "@/lib/feedPosts";
 import {
   interleaveFeed,
   memoryDrawCount,
@@ -58,14 +60,16 @@ export default async function HomePage() {
   const storageReady = isStorageConfigured();
 
   // Home queries the source tables directly — no activity-feed system (spec §43).
-  const [meals, confirmations, dogs, shopping, pickups, memoryPool] = await Promise.all([
+  const [meals, confirmations, dogs, shopping, pickups, memoryPool, feedPostRows] = await Promise.all([
     getUpcomingMeals(5),
     getMealsAwaitingConfirmation(member.id),
     getDogStatuses(),
     getOpenShoppingItems(),
     getRecentPickupActivity(),
     storageReady ? getReadyMemories(MEMORY_POOL) : Promise.resolve([]),
+    getActiveFeedPosts(member.id),
   ]);
+  const feedPosts = await withPostThumbnailUrls(feedPostRows);
 
   // Only the drawn memories get presigned URLs — no point signing the pool.
   const seed = memoryDrawSeed();
@@ -93,6 +97,29 @@ export default async function HomePage() {
           Hey {member.displayName}
         </h1>
       </header>
+
+      {/* The one thing anyone can put here themselves, so it goes first —
+          above even the meal confirmations, which are the house's own
+          business rather than something a person chose to say. */}
+      <FeedPostsSection
+        posts={feedPosts.map((post) => ({
+          id: post.id,
+          body: post.body,
+          author: post.author,
+          authorMemberId: post.authorMemberId,
+          createdAt: post.createdAt.toISOString(),
+          media: post.media
+            ? {
+                kind: post.media.kind,
+                thumbnailUrl: post.thumbnailUrl,
+                ready: post.media.processingStatus === "ready",
+              }
+            : null,
+        }))}
+        currentMemberId={member.id}
+        isAdmin={member.isAdmin}
+        storageReady={storageReady}
+      />
 
       {/* Above "Coming up" because it's the one thing here that wants an
           answer rather than a glance. It disappears once given. */}

@@ -15,7 +15,7 @@ screen.
 
 | Screen | Route | What it does |
 |---|---|---|
-| Home | `/` | Upcoming meals, your meal confirmations, Alice's status, shopping summary, recent memories |
+| Home | `/` | Feed posts from anyone, upcoming meals, your meal confirmations, Alice's status, shopping summary, recent memories |
 | Meals | `/meals` | The whole week with deeply pretentious descriptions; only the cook can rename their own |
 | Alice | `/dogs` | Three big buttons: out, pooped, fed. One tap, recorded under your name |
 | Shopping | `/shopping` | Add something, anyone can mark it picked up |
@@ -41,7 +41,9 @@ Phone ──► Railway (Next.js 16, App Router)
              └─► Railway Bucket       private S3, originals + derivatives
 ```
 
-- **No** Redis, job queue, separate API server, CMS, WebSockets, or runtime AI.
+- **No** Redis, job queue, separate API server, CMS, or WebSockets. The one
+  runtime AI call is Ollama's cloud API, used only to regenerate a meal's
+  fancy description after a rename — see [AI meal descriptions](#ai-meal-descriptions).
 - Home refreshes when the app regains focus and every 30s while visible. No
   subscriptions — with five users that's plenty.
 - All times render in `America/Toronto` regardless of where the server or the
@@ -50,9 +52,11 @@ Phone ──► Railway (Next.js 16, App Router)
   `lib/time`). 22 hours before each one, whoever is cooking gets a tile on Home
   asking them to confirm it or type a new name — which lands the ask just after
   the previous day's equivalent meal. Renaming clears the seeded description and
-  photo, since they describe the old dish; regenerating them needs runtime AI,
-  which the app still doesn't have. Saving an edit *is* the confirmation — there
-  is no second step. Confirmed meals carry a badge on Home and `/meals`.
+  photo immediately, since they describe the old dish, then regenerates the
+  description for the new title in the background (blank if regeneration is
+  unconfigured or fails — never blocks the rename). Saving an edit *is* the
+  confirmation — there is no second step. Confirmed meals carry a badge on
+  Home and `/meals`.
 - Many meals have two cooks, and both get the same prompt. Either may answer and
   only the first answer counts: the write is conditional on `confirmed_at` still
   being null, so simultaneous taps resolve to one winner and the other cook is
@@ -258,6 +262,43 @@ byte-identically, and asserts an unsigned URL is rejected.
 
 New objects land under `memories/`; anything uploaded before the rename still
 lives under `photos/` and is found by the key stored on its row.
+
+---
+
+## Feed posts
+
+Anyone can pin a short message — text, a photo/video, or both — to the top of
+everyone's Home feed (`feed_posts`). Dismissing one only hides it for the
+member who dismissed it (`feed_post_dismissals`); everyone else still sees it
+until they each do the same. The author, or an admin, can instead remove a
+post for everyone.
+
+An attachment goes through the exact upload pipeline `/memories` uses
+(`lib/uploads/browser.ts`, shared with the Memories screen) before the post is
+even submitted, so it's an ordinary `media` row — it shows up in `/memories`
+regardless of whether the post itself survives.
+
+---
+
+## AI meal descriptions
+
+`display_description` was always meant to hold AI-generated restaurant prose
+(spec §9.4); V1 shipped with hand-authored seed descriptions and no runtime
+call. Renaming a meal now regenerates one, via
+[Ollama's cloud API](https://docs.ollama.com/cloud):
+
+```bash
+OLLAMA_API_KEY="…"                    # ollama.com/settings/keys
+OLLAMA_MODEL="glm-5.3-flash:cloud"    # default; override to try another model
+```
+
+`lib/ai/mealDescription.ts` is the whole integration: `isAiConfigured()` gates
+it off entirely when `OLLAMA_API_KEY` is unset (renaming then just clears the
+description, exactly as before this existed), and `generateMealDescription`
+never throws — a timeout, a non-2xx response, or a malformed reply all just
+leave the description blank rather than fail the rename. The call itself runs
+in `after()` in `app/(app)/meals/actions.ts`, off the response path, and is
+guarded to only write back if the meal's title hasn't changed again since.
 
 ---
 

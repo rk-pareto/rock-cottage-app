@@ -275,6 +275,50 @@ export const memoryFavorites = pgTable(
   ],
 );
 
+/**
+ * A message any member can pin to the top of the home feed — text, a photo
+ * or video, or both. `mediaId` points at an ordinary `media` row uploaded
+ * through the same pipeline as `/memories`, so an attachment is a real
+ * memory from the moment it's posted, not a separate copy.
+ */
+export const feedPosts = pgTable(
+  "feed_posts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    authorMemberId: uuid("author_member_id")
+      .notNull()
+      .references(() => members.id, { onDelete: "restrict" }),
+    /** Nullable — a post can be media-only. */
+    body: text("body"),
+    /**
+     * Null when there's no attachment, or once the underlying memory has
+     * been deleted from the gallery — the message still stands on its own.
+     */
+    mediaId: uuid("media_id").references(() => media.id, { onDelete: "set null" }),
+    createdAt,
+  },
+  (t) => [index("feed_posts_created_at_idx").on(t.createdAt.desc())],
+);
+
+/**
+ * Per-member dismissals of a feed post. Never joined across members — a
+ * dismissal only ever hides the post from the one person who swiped it away,
+ * same privacy shape as {@link memoryFavorites}.
+ */
+export const feedPostDismissals = pgTable(
+  "feed_post_dismissals",
+  {
+    memberId: uuid("member_id")
+      .notNull()
+      .references(() => members.id, { onDelete: "cascade" }),
+    postId: uuid("post_id")
+      .notNull()
+      .references(() => feedPosts.id, { onDelete: "cascade" }),
+    createdAt,
+  },
+  (t) => [primaryKey({ columns: [t.memberId, t.postId] })],
+);
+
 export type Member = typeof members.$inferSelect;
 export type Meal = typeof meals.$inferSelect;
 export type Pet = typeof pets.$inferSelect;
@@ -283,4 +327,6 @@ export type ShoppingItem = typeof shoppingItems.$inferSelect;
 export type BringingItem = typeof bringingItems.$inferSelect;
 export type Media = typeof media.$inferSelect;
 export type MemoryFavorite = typeof memoryFavorites.$inferSelect;
+export type FeedPost = typeof feedPosts.$inferSelect;
+export type FeedPostDismissal = typeof feedPostDismissals.$inferSelect;
 

@@ -1,9 +1,11 @@
 "use server";
 
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { mealAssignments, meals, members, type Member } from "@/db/schema";
+import { generateMealDescription, isAiConfigured } from "@/lib/ai/mealDescription";
 import { requireMember } from "@/lib/auth/membership";
 import { mealTitleSchema, uuidSchema } from "@/lib/validation/schemas";
 
@@ -120,9 +122,11 @@ export async function confirmMeal(mealId: string): Promise<ActionResult> {
  * "Actually, we're having something else." Renaming answers the prompt too —
  * telling us what you're cooking is a stronger confirmation than tapping yes.
  *
- * The seeded description and photo describe the old dish, so they go: a
- * tasting-menu paragraph about pizza under the word "Tacos" is worse than no
- * paragraph at all. Regenerating them is a later job (spec §44, runtime AI).
+ * The seeded description and photo describe the old dish, so they go
+ * immediately: a tasting-menu paragraph about pizza under the word "Tacos" is
+ * worse than no paragraph at all. A new description is then regenerated for
+ * the new title via runtime AI (spec §9.4) — off the response path, so a slow
+ * or unconfigured model never blocks the rename itself.
  */
 export async function updateMealTitle(mealId: string, title: string): Promise<ActionResult> {
   const guarded = await guard(mealId);
@@ -136,12 +140,28 @@ export async function updateMealTitle(mealId: string, title: string): Promise<Ac
   // Submitting the name unchanged is just a confirmation — don't throw away
   // the description and photo over a no-op edit.
   const renamed = parsed.data !== guarded.meal.title;
+  const newTitle = parsed.data;
 
   try {
-    return await claim(guarded.meal, guarded.member, {
-      title: parsed.data,
+    const result = await claim(guarded.meal, guarded.member, {
+      title: newTitle,
       ...(renamed ? { displayDescription: null, photoPath: null } : {}),
     });
+
+    if (result.ok && renamed && isAiConfigured()) {
+      after(async () => {
+        const description = await generateMealDescription(newTitle);
+        if (!description) return;
+        // Guard against a second rename landing before this finishes — only
+        // apply the prose if the title is still the one it was written for.
+        await db
+          .update(meals)
+          .set({ displayDescription: description, updatedAt: new Date() })
+          .where(and(eq(meals.id, mealId), eq(meals.title, newTitle)));
+      });
+    }
+
+    return result;
   } catch (error) {
     console.error("updateMealTitle failed", error);
     return fail("Couldn't update that meal. Try again.");

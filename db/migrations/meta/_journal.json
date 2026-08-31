@@ -57,6 +57,13 @@
       "when": 1787835663672,
       "tag": "0007_video_playback",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1788138794121,
+      "tag": "0008_feed_posts",
+      "breakpoints": true
     }
   ]
 }
