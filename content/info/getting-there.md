@@ -9,6 +9,7 @@ description: Address, coordinates, and parking.
 **1323 Carlingford Road 2, Port Carling, ON P0B 1J0**
 
 - [Open in Google Maps](https://maps.google.com/?q=45.1651840,-79.6891170)
+- [Get directions (Google Maps)](https://goo.gl/maps/Vv5KNr1tJFvvRGkH6?g_st=ac)
 - [Open in Apple Maps](https://maps.apple.com/?ll=45.1651840,-79.6891170&q=Rock%20Cut%20Cottage)
 - Coordinates: `45.1651840, -79.6891170`
 
