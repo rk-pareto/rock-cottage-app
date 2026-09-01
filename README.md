@@ -388,7 +388,27 @@ npm run lint && npm test && npm run build   # check before shipping
 railway up --service web --environment production --ci
 ```
 
-Config lives in `railway.json` (`preDeployCommand`, `healthcheckPath`).
+Config lives in `.railway/railway.ts` (Railway Infrastructure as Code), which
+replaced the deprecated `railway.json` — that file stops being read on
+2026-12-01. Changing deploy settings is a two-step, and the plan is not
+optional:
+
+```bash
+railway config plan    # read this
+railway config apply
+```
+
+**An apply deletes anything the file doesn't mention**, and that includes the
+service's variables: a file listing only the deploy settings plans to delete
+all fourteen (`DATABASE_URL` and the auth secret among them) and disconnect the
+GitHub source. That is why every variable appears as `preserve()` — meaning
+"keep Railway's value" — and why the source is declared. **Add a variable in
+the Railway dashboard and you must add a `preserve()` line for it**, or the
+next apply removes it.
+
+`railway config migrate` is not to be trusted blindly: it named the service
+after the repo rather than `web`, and it emitted `preDeployCommand` as a
+comment, which would have made every future deploy skip migrations.
 
 The seed is **not** run automatically. Run it deliberately:
 

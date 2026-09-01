@@ -46,6 +46,7 @@ next-env.d.ts
 .env.local
 .env*.local
 
-# railway local link state
-.railway/
+# railway local link state — but railway.ts is the deploy config itself
+.railway/*
+!.railway/railway.ts
 .neon
