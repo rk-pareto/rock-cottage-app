@@ -128,6 +128,13 @@ export const uploadIntentSchema = z
     durationSeconds: z.number().nonnegative().max(24 * 60 * 60).optional(),
     /** Whether a poster frame will follow, so the intent can presign for it. */
     hasPoster: z.boolean().optional(),
+    /**
+     * The row a previous, failed attempt at this same file already created.
+     * A retry re-presigns onto it instead of inserting a second row, so
+     * retrying doesn't leave a permanent "Processing…" tile in everyone's
+     * grid for bytes that never arrived.
+     */
+    retryOfMemoryId: uuidSchema.optional(),
   })
   .superRefine((value, ctx) => {
     const kind = kindForContentType(value.contentType);

@@ -42,6 +42,12 @@ type UploadState = {
   /** 0–1 while the bytes are moving; a long video needs a real bar. */
   progress?: number;
   message?: string;
+  /** Kept for the whole life of the row so a failure can be retried without
+   *  making anyone find the photo in their camera roll a second time. */
+  file: File;
+  /** The row the attempt created, so a retry lands on it instead of leaving a
+   *  stranded "Processing…" tile behind. Absent if it never got that far. */
+  memoryId?: string;
 };
 
 export function MemoriesClient({
@@ -78,12 +84,27 @@ export function MemoriesClient({
 
   /** Upload one file end to end: intent → direct PUT (→ poster) → complete. */
   const uploadOne = useCallback(
-    async (file: File, key: string) => {
-      await uploadMedia(file, (progress) => patch(key, progress));
+    async (file: File, key: string, retryOfMemoryId?: string) => {
+      const result = await uploadMedia(file, (progress) => patch(key, progress), retryOfMemoryId);
+      // Remember the row either way: on a failure it is what the retry re-uses.
+      if (result.memoryId) patch(key, { memoryId: result.memoryId });
       router.refresh();
     },
     [router, patch],
   );
+
+  /** Try a failed upload again with the file still in hand. */
+  const retryUpload = useCallback(
+    (upload: UploadState) => {
+      patch(upload.key, { stage: "uploading", progress: undefined, message: undefined });
+      void uploadOne(upload.file, upload.key, upload.memoryId);
+    },
+    [patch, uploadOne],
+  );
+
+  const dismissUpload = useCallback((key: string) => {
+    setUploads((current) => current.filter((u) => u.key !== key));
+  }, []);
 
   /**
    * Fetch the shareable bytes, reusing the copy started when the lightbox
@@ -154,6 +175,7 @@ export function MemoriesClient({
         key,
         name: file.name,
         stage: "uploading" as const,
+        file,
       })),
     ]);
 
@@ -253,6 +275,28 @@ export function MemoriesClient({
                     ? "Processing…"
                     : (upload.message ?? "Failed")}
               </span>
+              {/* A failed upload is nearly always a phone that lost signal
+                  mid-PUT, and the file is still right here — so the fix is one
+                  tap, not another trip through the camera roll. */}
+              {upload.stage === "failed" ? (
+                <span className="relative flex shrink-0 items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => retryUpload(upload)}
+                    className="tap rounded-lg bg-ink px-2.5 py-1 text-xs font-extrabold tracking-tight text-paper transition active:scale-95"
+                  >
+                    Retry
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => dismissUpload(upload.key)}
+                    aria-label={`Dismiss ${upload.name}`}
+                    className="tap px-1 text-xs font-bold text-muted"
+                  >
+                    ✕
+                  </button>
+                </span>
+              ) : null}
             </li>
           ))}
         </ul>

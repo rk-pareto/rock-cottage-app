@@ -169,16 +169,28 @@ export function supportsFileSharing(): boolean {
   return fileSharingSupport;
 }
 
+export type UploadResult =
+  | { ok: true; memoryId: string }
+  /** `memoryId` is present whenever the intent got as far as making a row —
+   *  hand it back to `retryOfMemoryId` so a retry re-uses it. */
+  | { ok: false; message: string; memoryId?: string };
+
 /**
  * Upload one file end to end: intent → direct PUT (→ poster) → complete.
  * Shared by the Memories screen's multi-file uploader and the feed post
  * composer's single-attachment one, so both go through exactly one path from
  * a chosen `File` to a `ready` (or `failed`) `media` row.
+ *
+ * Every step here can fail on a phone halfway up a hill — most often the PUT
+ * itself, which is minutes of radio for a large clip — so failure is never
+ * terminal: the caller keeps the `File` and calls this again, passing
+ * `retryOfMemoryId` so the abandoned row is re-used rather than piling up.
  */
 export async function uploadMedia(
   file: File,
   onProgress?: (patch: { stage: "uploading" | "processing" | "done" | "failed"; progress?: number; message?: string }) => void,
-): Promise<{ ok: true; memoryId: string } | { ok: false; message: string }> {
+  retryOfMemoryId?: string,
+): Promise<UploadResult> {
   try {
     const contentType = file.type || guessContentType(file.name);
     const isVideo = contentType.startsWith("video/");
@@ -196,10 +208,17 @@ export async function uploadMedia(
         height: probed?.height,
         durationSeconds: probed?.durationSeconds,
         hasPoster: Boolean(probed?.poster),
+        retryOfMemoryId,
       }),
     });
 
     if (!intentResponse.ok) {
+      // The row this retry meant to re-use is gone or already finished (409).
+      // The file in hand is still perfectly uploadable, so start it clean
+      // rather than leaving the retry button permanently broken.
+      if (retryOfMemoryId && intentResponse.status === 409) {
+        return uploadMedia(file, onProgress);
+      }
       const body = await intentResponse.json().catch(() => ({}));
       const message = body.error ?? "Upload couldn't start.";
       onProgress?.({ stage: "failed", message });
@@ -218,7 +237,7 @@ export async function uploadMedia(
     if (!uploaded) {
       const message = "The upload didn't finish.";
       onProgress?.({ stage: "failed", message });
-      return { ok: false, message };
+      return { ok: false, message, memoryId };
     }
 
     // Best effort: a clip with no poster still plays, it just shows a
@@ -241,7 +260,7 @@ export async function uploadMedia(
 
     const message = completeBody.error ?? "Preview couldn't be created.";
     onProgress?.({ stage: "failed", message });
-    return { ok: false, message };
+    return { ok: false, message, memoryId };
   } catch {
     const message = "Something went wrong. Try again.";
     onProgress?.({ stage: "failed", message });

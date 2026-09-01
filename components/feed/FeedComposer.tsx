@@ -22,17 +22,37 @@ export function FeedComposer({ storageReady }: { storageReady: boolean }) {
   const [open, setOpen] = useState(false);
   const [body, setBody] = useState("");
   const [posting, setPosting] = useState(false);
-  const [attachmentName, setAttachmentName] = useState<string | null>(null);
+  /** Held for as long as the attachment is, so a failed upload can be tried
+   *  again without reopening the picker. */
+  const [attachment, setAttachment] = useState<File | null>(null);
   const [uploadState, setUploadState] = useState<UploadState>("idle");
   const [uploadProgress, setUploadProgress] = useState<number>();
+  /** The row the upload made. Set on success, and on a failure too — there it
+   *  is what a retry re-uses instead of stranding the first attempt's row. */
   const [mediaId, setMediaId] = useState<string | null>(null);
 
   function reset() {
     setBody("");
-    setAttachmentName(null);
+    setAttachment(null);
     setUploadState("idle");
     setUploadProgress(undefined);
     setMediaId(null);
+  }
+
+  async function upload(file: File, retryOfMemoryId?: string) {
+    setUploadState("uploading");
+    setUploadProgress(undefined);
+    const result = await uploadMedia(
+      file,
+      (patch) => {
+        setUploadState(patch.stage);
+        setUploadProgress(patch.progress);
+      },
+      retryOfMemoryId,
+    );
+    // Kept whether or not it worked: on success it is what gets posted, on a
+    // failure it is what Retry lands on. `uploadState` is what decides which.
+    setMediaId(result.memoryId ?? null);
   }
 
   async function onFileChosen(event: React.ChangeEvent<HTMLInputElement>) {
@@ -40,32 +60,30 @@ export function FeedComposer({ storageReady }: { storageReady: boolean }) {
     event.target.value = ""; // let the same file be re-picked
     if (!file) return;
 
-    setAttachmentName(file.name);
+    setAttachment(file);
     setMediaId(null);
-    setUploadState("uploading");
-    const result = await uploadMedia(file, (patch) => {
-      setUploadState(patch.stage);
-      setUploadProgress(patch.progress);
-    });
-    if (result.ok) setMediaId(result.memoryId);
+    await upload(file);
   }
 
   function removeAttachment() {
-    setAttachmentName(null);
+    setAttachment(null);
     setUploadState("idle");
     setUploadProgress(undefined);
     setMediaId(null);
   }
 
   const busy = uploadState === "uploading" || uploadState === "processing";
-  const canSubmit = !posting && !busy && (body.trim().length > 0 || Boolean(mediaId));
+  // A failed attachment still holds a `mediaId`, so what makes a post
+  // submittable is the upload having finished — not merely having an id.
+  const attached = uploadState === "done" ? mediaId : null;
+  const canSubmit = !posting && !busy && (body.trim().length > 0 || Boolean(attached));
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     if (!canSubmit) return;
 
     setPosting(true);
-    const result = await createFeedPost(body.trim() || null, mediaId);
+    const result = await createFeedPost(body.trim() || null, attached);
     setPosting(false);
 
     if (result.ok) {
@@ -118,7 +136,7 @@ export function FeedComposer({ storageReady }: { storageReady: boolean }) {
         className="hidden"
       />
 
-      {attachmentName ? (
+      {attachment ? (
         <div className="relative mt-2 flex items-center gap-3 overflow-hidden rounded-xl border border-line bg-subtle px-3 py-2.5 text-sm">
           {uploadState === "uploading" && uploadProgress !== undefined ? (
             <span
@@ -127,7 +145,7 @@ export function FeedComposer({ storageReady }: { storageReady: boolean }) {
               style={{ width: `${Math.round(uploadProgress * 100)}%` }}
             />
           ) : null}
-          <span className="relative min-w-0 flex-1 truncate text-ink">{attachmentName}</span>
+          <span className="relative min-w-0 flex-1 truncate text-ink">{attachment.name}</span>
           <span
             className={`label relative shrink-0 ${uploadState === "failed" ? "text-clay" : "text-muted"}`}
           >
@@ -141,6 +159,17 @@ export function FeedComposer({ storageReady }: { storageReady: boolean }) {
                   ? "Ready"
                   : "Failed"}
           </span>
+          {/* The file never left the page, so a drop-out mid-upload costs one
+              tap rather than another trip through the picker. */}
+          {uploadState === "failed" ? (
+            <button
+              type="button"
+              onClick={() => upload(attachment, mediaId ?? undefined)}
+              className="tap relative shrink-0 rounded-lg bg-ink px-2.5 py-1 text-xs font-extrabold tracking-tight text-paper transition active:scale-95"
+            >
+              Retry
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={removeAttachment}

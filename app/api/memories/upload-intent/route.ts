@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { media } from "@/db/schema";
 import { requireMember } from "@/lib/auth/membership";
@@ -36,47 +36,106 @@ export async function POST(request: Request) {
     );
   }
 
-  const { filename, contentType, bytes, kind, width, height, durationSeconds, hasPoster } =
-    parsed.data;
+  const {
+    filename,
+    contentType,
+    bytes,
+    kind,
+    width,
+    height,
+    durationSeconds,
+    hasPoster,
+    retryOfMemoryId,
+  } = parsed.data;
   const isVideo = kind === "video";
 
-  const [row] = await db
-    .insert(media)
-    .values({
-      kind,
-      // Placeholder — replaced below once the generated id is known.
-      originalKey: "",
-      originalFilename: filename,
-      originalContentType: contentType,
-      originalBytes: bytes,
-      // A still's real dimensions come from decoding it; a clip's can only
-      // come from the browser that just played it.
-      originalWidth: isVideo ? (width ?? null) : null,
-      originalHeight: isVideo ? (height ?? null) : null,
-      durationSeconds: isVideo && durationSeconds !== undefined ? Math.round(durationSeconds) : null,
-      uploadedByMemberId: member.id,
-      processingStatus: "pending",
-      // A clip queues for its playback copy from the moment the row exists, so
-      // the boot sweep also picks up uploads that never made it to /complete.
-      playbackStatus: isVideo ? "pending" : null,
-    })
-    .returning({ id: media.id });
+  // Shared by the insert and the retry update — a retry may be of a different
+  // file to the one the abandoned row was created for (the picker was reopened),
+  // so every field is restated rather than assumed unchanged.
+  const details = {
+    kind,
+    originalFilename: filename,
+    originalContentType: contentType,
+    originalBytes: bytes,
+    // A still's real dimensions come from decoding it; a clip's can only
+    // come from the browser that just played it.
+    originalWidth: isVideo ? (width ?? null) : null,
+    originalHeight: isVideo ? (height ?? null) : null,
+    durationSeconds: isVideo && durationSeconds !== undefined ? Math.round(durationSeconds) : null,
+    processingStatus: "pending" as const,
+    processingError: null,
+    // A clip queues for its playback copy from the moment the row exists, so
+    // the boot sweep also picks up uploads that never made it to /complete.
+    playbackStatus: isVideo ? ("pending" as const) : null,
+  };
 
-  if (!row) {
-    return NextResponse.json({ error: "Couldn't start that upload." }, { status: 500 });
+  // A retry re-presigns onto the row the failed attempt already made, so
+  // trying again doesn't leave a second, orphaned row behind. Only the
+  // member's own row, and only one that never finished: a "ready" memory has
+  // real bytes and derivatives that must not be overwritten by a stray retry.
+  const id = retryOfMemoryId ? await claimForRetry(retryOfMemoryId, member.id) : null;
+  if (retryOfMemoryId && !id) {
+    return NextResponse.json({ error: "That upload can't be retried." }, { status: 409 });
   }
 
-  const key = originalKey(row.id, filename);
-  const poster = isVideo && hasPoster ? posterKey(row.id) : null;
+  let memoryId = id;
+  if (!memoryId) {
+    const [row] = await db
+      .insert(media)
+      .values({
+        ...details,
+        // Placeholder — replaced below once the generated id is known.
+        originalKey: "",
+        uploadedByMemberId: member.id,
+      })
+      .returning({ id: media.id });
+
+    if (!row) {
+      return NextResponse.json({ error: "Couldn't start that upload." }, { status: 500 });
+    }
+    memoryId = row.id;
+  }
+
+  const key = originalKey(memoryId, filename);
+  const poster = isVideo && hasPoster ? posterKey(memoryId) : null;
   await db
     .update(media)
-    .set({ originalKey: key, posterKey: poster })
-    .where(eq(media.id, row.id));
+    .set({
+      ...details,
+      originalKey: key,
+      posterKey: poster,
+      // A retry of what was a video with a poster, as a photo, must not keep
+      // pointing at derivatives built from the abandoned attempt.
+      displayKey: null,
+      thumbnailKey: null,
+      updatedAt: new Date(),
+    })
+    .where(eq(media.id, memoryId));
 
   const [uploadUrl, posterUploadUrl] = await Promise.all([
     presignUpload(key, contentType),
     poster ? presignUpload(poster, "image/jpeg") : Promise.resolve(null),
   ]);
 
-  return NextResponse.json({ memoryId: row.id, kind, uploadUrl, posterUploadUrl });
+  return NextResponse.json({ memoryId, kind, uploadUrl, posterUploadUrl });
+}
+
+/**
+ * The id of the caller's own unfinished row, or null if there isn't one to
+ * re-use — a row belonging to someone else, an already-ready memory, or an id
+ * for a memory that has since been deleted.
+ */
+async function claimForRetry(memoryId: string, memberId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ id: media.id })
+    .from(media)
+    .where(
+      and(
+        eq(media.id, memoryId),
+        eq(media.uploadedByMemberId, memberId),
+        ne(media.processingStatus, "ready"),
+      ),
+    )
+    .limit(1);
+  return row?.id ?? null;
 }
