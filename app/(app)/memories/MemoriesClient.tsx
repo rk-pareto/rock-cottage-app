@@ -12,6 +12,7 @@ import { useToast } from "@/components/ui/Toast";
 import { deleteMemory, toggleFavorite } from "./actions";
 import { HeartGlyph, PlayGlyph } from "@/components/ui/icons";
 import { Lightbox } from "@/components/memories/Lightbox";
+import { placeholderLabel } from "@/lib/memoryStatus";
 import { supportsFileSharing, uploadMedia } from "@/lib/uploads/browser";
 
 export type MemoryCardData = {
@@ -21,6 +22,9 @@ export type MemoryCardData = {
   uploadedBy: string;
   uploadedByMemberId: string;
   processingStatus: string;
+  /** The row's bytes never reached the bucket — there is nothing to build a
+   *  preview from, and only sending the file again will fix it. */
+  uploadIncomplete: boolean;
   thumbnailUrl: string | null;
   /** Presigned full-size copy, so the viewer loads straight from the bucket. */
   displayUrl: string | null;
@@ -67,6 +71,11 @@ export function MemoriesClient({
   const toast = useToast();
   const [, startTransition] = useTransition();
   const fileInput = useRef<HTMLInputElement>(null);
+  // A second picker, for sending one file again into a row that already
+  // exists. Kept apart from the main one so a re-upload can never be mistaken
+  // for a fresh multi-file batch.
+  const reuploadInput = useRef<HTMLInputElement>(null);
+  const reuploadTarget = useRef<string | null>(null);
   const [uploads, setUploads] = useState<UploadState[]>([]);
   const [lightboxId, setLightboxId] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
@@ -102,6 +111,37 @@ export function MemoriesClient({
       void uploadOne(upload.file, upload.key, upload.memoryId);
     },
     [patch, uploadOne],
+  );
+
+  /**
+   * Send a file into a memory that never got one.
+   *
+   * The in-uploader Retry still has the original `File` in hand; this is for
+   * the tile left behind after the page was closed and reloaded, where the
+   * file is long gone and the row is all that remains. Picking the photo again
+   * lands it on that same row rather than stranding a second one.
+   */
+  const reuploadInto = useCallback((memoryId: string) => {
+    reuploadTarget.current = memoryId;
+    reuploadInput.current?.click();
+  }, []);
+
+  const onReuploadChosen = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      const memoryId = reuploadTarget.current;
+      event.target.value = "";
+      reuploadTarget.current = null;
+      if (!file || !memoryId) return;
+
+      const key = `${Date.now()}-again-${file.name}`;
+      setUploads((current) => [
+        ...current,
+        { key, name: file.name, stage: "uploading" as const, file, memoryId },
+      ]);
+      await uploadOne(file, key, memoryId);
+    },
+    [uploadOne],
   );
 
   const dismissUpload = useCallback((key: string) => {
@@ -233,6 +273,13 @@ export function MemoriesClient({
         accept="image/*,video/*,.heic,.heif,.mov,.m4v"
         multiple
         onChange={onFilesChosen}
+        className="hidden"
+      />
+      <input
+        ref={reuploadInput}
+        type="file"
+        accept="image/*,video/*,.heic,.heif,.mov,.m4v"
+        onChange={onReuploadChosen}
         className="hidden"
       />
       <button
@@ -374,8 +421,20 @@ export function MemoriesClient({
               ) : (
                 <div className="flex h-full w-full flex-col items-center justify-center rounded-lg border border-dashed border-line-strong p-1 text-center">
                   <span className="text-[10px] font-bold text-muted">
-                    {memory.processingStatus === "failed" ? "No preview" : "Processing…"}
+                    {placeholderLabel(memory)}
                   </span>
+                  {/* Only the uploader's own row can be re-used by a retry, so
+                      only they are offered one; an admin still gets Delete. */}
+                  {memory.processingStatus === "failed" &&
+                  memory.uploadedByMemberId === currentMemberId ? (
+                    <button
+                      type="button"
+                      onClick={() => reuploadInto(memory.id)}
+                      className="mt-1 text-[10px] font-bold text-ink underline"
+                    >
+                      Upload again
+                    </button>
+                  ) : null}
                   {canDelete(memory) ? (
                     <button
                       type="button"

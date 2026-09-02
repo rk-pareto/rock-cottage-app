@@ -7,6 +7,7 @@ import {
   getMemories,
   hasPlaybackCopy,
   isShareable,
+  uploadIncomplete,
   withViewUrls,
 } from "@/lib/memories";
 import { isStorageConfigured } from "@/lib/storage/s3";
@@ -34,6 +35,7 @@ export default async function MemoriesPage() {
           uploadedBy: r.uploadedBy,
           uploadedByMemberId: r.uploadedByMemberId,
           processingStatus: r.processingStatus,
+          uploadIncomplete: uploadIncomplete(r),
           thumbnailUrl: r.thumbnailUrl,
           displayUrl: r.displayUrl,
           durationLabel: formatDuration(r.durationSeconds),

@@ -13,9 +13,34 @@ const POSTER_MAX_EDGE = 1280;
 const POSTER_QUALITY = 0.85;
 
 /**
+ * How long a PUT may go without a single byte moving before it is given up on.
+ *
+ * Not a total timeout: a large clip on cottage wifi legitimately takes many
+ * minutes, and cutting it off at any fixed duration would break the uploads
+ * that need the most patience. What is never legitimate is *silence* — a phone
+ * that walked out of signal leaves an XHR that will sit there forever without
+ * firing error, load or abort.
+ */
+const STALL_TIMEOUT_MS = 45_000;
+
+/**
+ * And how long the bucket then gets to acknowledge it. The last byte leaving
+ * the phone is not the end of the request: a large object still has to be
+ * written before the 200 comes back, and no progress events are fired while
+ * that happens. Generous, because cutting off an upload that actually arrived
+ * is the one outcome worse than waiting.
+ */
+const RESPONSE_TIMEOUT_MS = 120_000;
+
+/**
  * PUT straight to the bucket. `fetch` can't report upload progress and a video
  * takes long enough that a silent spinner reads as broken, so this goes
  * through XHR for the one thing XHR still does better.
+ *
+ * Resolves false rather than hanging when the transfer stalls. That matters
+ * beyond this one file: the Memories uploader awaits these in sequence, so an
+ * XHR that never settles doesn't just lose its own photo, it strands every
+ * file queued behind it — they never even reach the intent step.
  */
 export function putToBucket(
   url: string,
@@ -27,14 +52,28 @@ export function putToBucket(
     const request = new XMLHttpRequest();
     request.open("PUT", url);
     request.setRequestHeader("content-type", contentType);
-    if (onProgress) {
-      request.upload.onprogress = (event) => {
-        if (event.lengthComputable) onProgress(event.loaded / event.total);
-      };
-    }
-    request.onload = () => resolve(request.status >= 200 && request.status < 300);
-    request.onerror = () => resolve(false);
-    request.onabort = () => resolve(false);
+
+    let watchdog: ReturnType<typeof setTimeout>;
+    const armWatchdog = (ms: number) => {
+      clearTimeout(watchdog);
+      watchdog = setTimeout(() => request.abort(), ms);
+    };
+    const settle = (ok: boolean) => {
+      clearTimeout(watchdog);
+      resolve(ok);
+    };
+
+    request.upload.onprogress = (event) => {
+      armWatchdog(STALL_TIMEOUT_MS);
+      if (onProgress && event.lengthComputable) onProgress(event.loaded / event.total);
+    };
+    // Every byte is out; the clock is now the bucket's, not the radio's.
+    request.upload.onload = () => armWatchdog(RESPONSE_TIMEOUT_MS);
+    request.onload = () => settle(request.status >= 200 && request.status < 300);
+    request.onerror = () => settle(false);
+    request.onabort = () => settle(false);
+
+    armWatchdog(STALL_TIMEOUT_MS);
     request.send(body);
   });
 }

@@ -54,8 +54,15 @@ function s3(): S3Client {
   return client;
 }
 
-/** Short-lived URLs only — no permanent public bucket URLs (spec §14.7). */
-const UPLOAD_URL_TTL_SECONDS = 15 * 60;
+/**
+ * Short-lived URLs only — no permanent public bucket URLs (spec §14.7).
+ *
+ * The upload TTL is exported because it is also the point past which an
+ * unfinished memory is definitively wreckage rather than work in progress: the
+ * browser's PUT can no longer succeed, so nothing can move the row on its own
+ * (see `sweepStalledMedia`).
+ */
+export const UPLOAD_URL_TTL_SECONDS = 15 * 60;
 const DOWNLOAD_URL_TTL_SECONDS = 12 * 60;
 const VIEW_URL_TTL_SECONDS = 15 * 60;
 /**

@@ -2,6 +2,7 @@ import "server-only";
 import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { media, members, memoryFavorites, type MediaKind } from "@/db/schema";
+import { UPLOAD_NEVER_LANDED } from "@/lib/storage/derivatives";
 import { presignView } from "@/lib/storage/s3";
 import { MAX_SHAREABLE_VIDEO_BYTES } from "@/lib/validation/schemas";
 
@@ -19,6 +20,7 @@ export type MemoryRow = {
   uploadedBy: string;
   uploadedByMemberId: string;
   processingStatus: string;
+  processingError: string | null;
   thumbnailKey: string | null;
   displayKey: string | null;
   createdAt: Date;
@@ -46,6 +48,7 @@ function selectMemories() {
       uploadedBy: members.displayName,
       uploadedByMemberId: media.uploadedByMemberId,
       processingStatus: media.processingStatus,
+      processingError: media.processingError,
       thumbnailKey: media.thumbnailKey,
       displayKey: media.displayKey,
       createdAt: media.createdAt,
@@ -136,6 +139,21 @@ export function isShareable(memory: Pick<MemoryRow, "kind" | "originalBytes" | "
  */
 export function hasPlaybackCopy(memory: Pick<MemoryRow, "kind" | "playbackKey">) {
   return memory.kind === "video" && memory.playbackKey !== null;
+}
+
+/**
+ * Whether this memory's bytes never reached the bucket, as opposed to having
+ * arrived and merely failed to produce a preview.
+ *
+ * Both are `failed` rows with no derivatives, and the grid must not tell
+ * someone their photo is safe when it isn't there at all: this one can only be
+ * fixed by sending the file again, the other has an original in the bucket
+ * that is still downloadable and shareable.
+ */
+export function uploadIncomplete(
+  memory: Pick<MemoryRow, "processingStatus" | "processingError">,
+): boolean {
+  return memory.processingStatus === "failed" && memory.processingError === UPLOAD_NEVER_LANDED;
 }
 
 /** `0:07`, `1:42`, `12:05` — the badge in the corner of a video tile. */

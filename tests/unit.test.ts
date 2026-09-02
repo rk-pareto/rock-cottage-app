@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { introSteps } from "@/lib/intro/steps";
 import { isLockedOut, LOCKOUT_MS } from "@/lib/dogLock";
+import { placeholderLabel } from "@/lib/memoryStatus";
 import {
   dogsNavLabel,
   enabledPetSlugs,
@@ -568,5 +569,28 @@ describe("dog button lockout", () => {
     expect(isLockedOut(null, now)).toBe(false);
     expect(isLockedOut(undefined, now)).toBe(false);
     expect(isLockedOut("not a date", now)).toBe(false);
+  });
+});
+
+describe("memory tile placeholder", () => {
+  const tile = (processingStatus: string, uploadIncomplete = false) =>
+    placeholderLabel({ processingStatus, uploadIncomplete });
+
+  it("distinguishes waiting on the phone from working on the server", () => {
+    // The bug this exists to prevent: both of these read "Processing…", so an
+    // upload that died mid-PUT was indistinguishable from one being resized.
+    expect(tile("pending")).toBe("Uploading…");
+    expect(tile("processing")).toBe("Processing…");
+  });
+
+  it("only says the upload didn't finish when the bytes really are missing", () => {
+    expect(tile("failed", true)).toBe("Upload didn't finish");
+    // The original is in the bucket and still downloadable — saying the upload
+    // failed here would send someone hunting for a photo that is safe.
+    expect(tile("failed", false)).toBe("No preview");
+  });
+
+  it("falls back to no preview for a ready memory with no tile", () => {
+    expect(tile("ready")).toBe("No preview");
   });
 });

@@ -11,6 +11,7 @@ import {
   shoppingItems,
   type Member,
 } from "@/db/schema";
+import { findStalledMedia } from "@/lib/storage/derivatives";
 import { cleanupMembers, createTestMember } from "./helpers";
 
 /**
@@ -453,6 +454,49 @@ describe("memories", () => {
     currentMember = alice;
     expect(await deleteMemory(row!.id)).toEqual({ ok: true });
     expect(await db.select().from(media).where(eq(media.id, row!.id))).toHaveLength(0);
+  });
+
+  /**
+   * The sweep is the only thing that ever resolves an upload the browser
+   * abandoned, and it runs unattended against live rows. What it must never do
+   * is grab an upload that is still on its way up a phone's radio — hence the
+   * cutoff, and hence this test.
+   */
+  describe("stalled upload sweep", () => {
+    async function insertUpload(status: "pending" | "processing" | "ready", ageMinutes: number) {
+      const stamp = new Date(Date.now() - ageMinutes * 60_000);
+      const [row] = await db
+        .insert(media)
+        .values({
+          kind: "image",
+          originalKey: "memories/test/original/stalled.jpg",
+          originalFilename: "stalled.jpg",
+          originalContentType: "image/jpeg",
+          originalBytes: 4321,
+          uploadedByMemberId: alice.id,
+          processingStatus: status,
+          createdAt: stamp,
+          updatedAt: stamp,
+        })
+        .returning();
+      return row!;
+    }
+
+    it("claims unfinished rows only once their upload URL has expired", async () => {
+      const inFlight = await insertUpload("pending", 2);
+      const abandoned = await insertUpload("pending", 30);
+      const interrupted = await insertUpload("processing", 30);
+      const finished = await insertUpload("ready", 30);
+
+      const claimed = (await findStalledMedia()).map((row) => row.id);
+
+      expect(claimed).toContain(abandoned.id);
+      // A deploy killed the server mid-derive; nothing else will finish it.
+      expect(claimed).toContain(interrupted.id);
+      // Still uploading — its presigned PUT has ten minutes left on it.
+      expect(claimed).not.toContain(inFlight.id);
+      expect(claimed).not.toContain(finished.id);
+    });
   });
 });
 
