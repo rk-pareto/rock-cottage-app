@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { introSteps } from "@/lib/intro/steps";
+import { isLockedOut, LOCKOUT_MS } from "@/lib/dogLock";
 import {
   dogsNavLabel,
   enabledPetSlugs,
@@ -544,5 +545,28 @@ describe.skipIf(!isStorageConfigured())("presigned view URLs", () => {
     );
     const remaining = (signedMs + expiresIn * 1000 - Date.now()) / 1000;
     expect(remaining).toBeGreaterThanOrEqual(cacheSeconds);
+  });
+});
+
+describe("dog button lockout", () => {
+  const now = new Date("2026-09-02T18:00:00Z").getTime();
+
+  it("locks a button while its own last event is still fresh", () => {
+    expect(isLockedOut(new Date(now - 60_000).toISOString(), now)).toBe(true);
+    expect(isLockedOut(new Date(now - LOCKOUT_MS + 1000).toISOString(), now)).toBe(true);
+  });
+
+  it("goes by when the event happened, not when it was tapped", () => {
+    // Tapped "Fed" now, then corrected the time back to three hours ago: the
+    // dog is due, so the button has to reopen.
+    const corrected = new Date(now - 3 * 60 * 60 * 1000).toISOString();
+    expect(isLockedOut(corrected, now)).toBe(false);
+    expect(isLockedOut(new Date(now - LOCKOUT_MS).toISOString(), now)).toBe(false);
+  });
+
+  it("leaves a button open with nothing recorded, or an unreadable time", () => {
+    expect(isLockedOut(null, now)).toBe(false);
+    expect(isLockedOut(undefined, now)).toBe(false);
+    expect(isLockedOut("not a date", now)).toBe(false);
   });
 });

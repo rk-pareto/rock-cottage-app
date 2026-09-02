@@ -3,7 +3,7 @@ import { DogSection, type LatestEvent } from "@/components/dogs/DogSection";
 import { PageHeader } from "@/components/ui/Card";
 import type { SheetEvent } from "@/components/dogs/EventSheet";
 import { requireMember } from "@/lib/auth/membership";
-import { getDogStatuses, getRecentEvents } from "@/lib/dogs";
+import { getDogStatuses, getRecentEventsByType } from "@/lib/dogs";
 import { features } from "@/lib/features";
 import type { PetEventType } from "@/db/schema";
 
@@ -14,10 +14,13 @@ const EVENT_TYPES: PetEventType[] = ["outside", "poop", "fed"];
 export default async function DogsPage() {
   const member = await requireMember();
   const dogs = await getDogStatuses();
+  // One server timestamp for the whole render so the buttons' 15-minute
+  // lockout agrees between the server HTML and the first client render.
+  const renderedAt = new Date().toISOString();
 
   const sections = await Promise.all(
     dogs.map(async (dog) => {
-      const recent = await getRecentEvents(dog.id, 20);
+      const recent = await getRecentEventsByType(dog.id);
       const latest = Object.fromEntries(
         EVENT_TYPES.map((type) => {
           const event = dog.latest[type];
@@ -61,6 +64,7 @@ export default async function DogsPage() {
             name={dog.name}
             latest={latest}
             recent={sheetEvents}
+            renderedAt={renderedAt}
             currentMemberName={member.displayName}
           />
         ))

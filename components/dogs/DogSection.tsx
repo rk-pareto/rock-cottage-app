@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { RelativeTime } from "@/components/ui/RelativeTime";
 import { useToast } from "@/components/ui/Toast";
 import { recordPetEvent } from "@/app/(app)/dogs/actions";
+import { isLockedOut } from "@/lib/dogLock";
 import { relativeTime } from "@/lib/time";
 import type { PetEventType } from "@/db/schema";
 import { EventSheet, type SheetEvent } from "./EventSheet";
@@ -15,6 +16,8 @@ export type DogSectionProps = {
   name: string;
   latest: Record<PetEventType, LatestEvent>;
   recent: SheetEvent[];
+  /** Server render time, so the first client render locks the same buttons. */
+  renderedAt: string;
   currentMemberName: string;
 };
 
@@ -70,36 +73,10 @@ const ACTIONS: {
 // flicker in practice, easy to miss on a real tap-and-glance-away.
 const CONFIRM_MS = 1000;
 
-// A tap locks its own button for the rest of the household visit's worth of
-// wiggle room — long enough that a fat-fingered double tap can't land a
-// second event, short enough it's back for the next real outing. Scoped to
-// this device only (localStorage), so it never blocks someone else's tap.
-const LOCKOUT_MS = 15 * 60 * 1000;
-
-function lockStorageKey(slug: string, type: PetEventType) {
-  return `dog-lock:${slug}:${type}`;
-}
-
-function readLockedUntil(slug: string, type: PetEventType): number | null {
-  try {
-    const raw = window.localStorage.getItem(lockStorageKey(slug, type));
-    if (!raw) return null;
-    const until = Number(raw);
-    return Number.isFinite(until) && until > new Date().getTime() ? until : null;
-  } catch {
-    // Private browsing / storage disabled — no persistent lock, but the
-    // in-memory one set after a tap still covers this page load.
-    return null;
-  }
-}
-
-function writeLockedUntil(slug: string, type: PetEventType, until: number) {
-  try {
-    window.localStorage.setItem(lockStorageKey(slug, type), String(until));
-  } catch {
-    // Ignore — see readLockedUntil.
-  }
-}
+// How often the lock re-checks itself while the page sits open, so a button
+// comes back on its own a beat after the window passes. See `lib/dogLock` for
+// the rule itself.
+const LOCK_TICK_MS = 15_000;
 
 function CheckIcon({ className = "h-5 w-5" }: { className?: string }) {
   return (
@@ -135,7 +112,14 @@ function ActionIcon({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function DogSection({ slug, name, latest, recent, currentMemberName }: DogSectionProps) {
+export function DogSection({
+  slug,
+  name,
+  latest,
+  recent,
+  renderedAt,
+  currentMemberName,
+}: DogSectionProps) {
   const toast = useToast();
   const [, startTransition] = useTransition();
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -146,56 +130,39 @@ export function DogSection({ slug, name, latest, recent, currentMemberName }: Do
   // actually notice; the button badge above is a quieter echo of it.
   const [centerConfirm, setCenterConfirm] = useState<PetEventType | null>(null);
   const centerConfirmTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Actions this device tapped recently enough that they're still locked out,
-  // mapped to the epoch ms their lock expires.
-  const [lockedUntil, setLockedUntil] = useState<Partial<Record<PetEventType, number>>>({});
-  const lockTimeouts = useRef<Partial<Record<PetEventType, ReturnType<typeof setTimeout>>>>({});
+  // "Now", as far as the lockout is concerned. Starts at the server's render
+  // time so hydration matches, then keeps up on its own.
+  const [now, setNow] = useState(() => new Date(renderedAt).getTime());
 
-  function clearLock(type: PetEventType) {
-    setLockedUntil((prev) => {
+  useEffect(() => {
+    const tick = () => setNow(Date.now());
+    tick();
+    const timer = setInterval(tick, LOCK_TICK_MS);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (centerConfirmTimeout.current) clearTimeout(centerConfirmTimeout.current);
+    },
+    [],
+  );
+
+  function dropOptimistic(type: PetEventType) {
+    setOptimistic((prev) => {
       const next = { ...prev };
       delete next[type];
       return next;
     });
   }
 
-  function lock(type: PetEventType, until: number, delayMs: number) {
-    writeLockedUntil(slug, type, until);
-    setLockedUntil((prev) => ({ ...prev, [type]: until }));
-    const existing = lockTimeouts.current[type];
-    if (existing) clearTimeout(existing);
-    lockTimeouts.current[type] = setTimeout(() => clearLock(type), delayMs);
-  }
-
-  // Pick up any lock this device already set (e.g. the page was reloaded, or
-  // reopened, within the 15-minute window) and schedule it to lift on time.
-  useEffect(() => {
-    function restore(type: PetEventType) {
-      const until = readLockedUntil(slug, type);
-      if (until === null) return;
-      setLockedUntil((prev) => ({ ...prev, [type]: until }));
-      const delay = Math.max(0, until - new Date().getTime());
-      lockTimeouts.current[type] = setTimeout(() => clearLock(type), delay);
-    }
-    for (const { type } of ACTIONS) restore(type);
-  }, [slug]);
-
-  useEffect(() => {
-    const locked = lockTimeouts.current;
-    return () => {
-      Object.values(locked).forEach((id) => clearTimeout(id));
-      if (centerConfirmTimeout.current) clearTimeout(centerConfirmTimeout.current);
-    };
-  }, []);
-
-  function handleTap(type: PetEventType) {
-    if (pendingType || lockedUntil[type]) return; // guards against double-taps
+  function handleTap(type: PetEventType, locked: boolean) {
+    if (pendingType || locked) return; // guards against double-taps
     setPendingType(type);
     const tappedAt = new Date();
-    const now = tappedAt.toISOString();
     setOptimistic((prev) => ({
       ...prev,
-      [type]: { occurredAt: now, recordedBy: currentMemberName },
+      [type]: { occurredAt: tappedAt.toISOString(), recordedBy: currentMemberName },
     }));
 
     startTransition(async () => {
@@ -204,11 +171,7 @@ export function DogSection({ slug, name, latest, recent, currentMemberName }: Do
       if (!result.ok) {
         // Roll the optimistic value back — the real state is whatever the
         // server last rendered.
-        setOptimistic((prev) => {
-          const next = { ...prev };
-          delete next[type];
-          return next;
-        });
+        dropOptimistic(type);
         toast(result.error, "error");
         return;
       }
@@ -217,7 +180,12 @@ export function DogSection({ slug, name, latest, recent, currentMemberName }: Do
       if (centerConfirmTimeout.current) clearTimeout(centerConfirmTimeout.current);
       centerConfirmTimeout.current = setTimeout(() => setCenterConfirm(null), CONFIRM_MS);
 
-      lock(type, tappedAt.getTime() + LOCKOUT_MS, LOCKOUT_MS);
+      // Hand back to the server value that arrived with the action's
+      // revalidate. Holding the optimistic one would out-vote a later edit in
+      // the history sheet, and an edit is exactly what should reopen a button.
+      dropOptimistic(type);
+      // Keep "now" honest in case the tab had been idle since the last tick.
+      setNow(Date.now());
     });
   }
 
@@ -238,14 +206,14 @@ export function DogSection({ slug, name, latest, recent, currentMemberName }: Do
         {ACTIONS.map((action) => {
           const value = optimistic[action.type] ?? latest[action.type];
           const busy = pendingType === action.type;
-          const locked = Boolean(lockedUntil[action.type]);
+          const locked = isLockedOut(value?.occurredAt, now);
           return (
             <div key={action.type} className="flex flex-col gap-1.5">
               {/* Still the biggest thing on the screen — the flourish is gone,
                   the target isn't. */}
               <button
                 type="button"
-                onClick={() => handleTap(action.type)}
+                onClick={() => handleTap(action.type, locked)}
                 disabled={Boolean(pendingType) || locked}
                 className={`tap flex w-full items-center gap-3 rounded-xl px-5 py-4 text-left text-[1.0625rem] font-extrabold tracking-tight text-white transition active:scale-[0.995] disabled:opacity-60 ${action.tone}`}
               >

@@ -1,7 +1,7 @@
 import "server-only";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { members, petEvents, pets, type PetEventType } from "@/db/schema";
+import { members, PET_EVENT_TYPES, petEvents, pets, type PetEventType } from "@/db/schema";
 import { enabledPetSlugs } from "@/lib/features";
 
 export type DogEvent = {
@@ -56,8 +56,13 @@ export async function getDogStatuses(): Promise<DogStatus[]> {
   );
 }
 
-/** Recent history for the per-dog Edit sheet (spec §10.3). */
-export async function getRecentEvents(petId: string, limit = 20): Promise<DogEvent[]> {
+/** Recent history for the per-dog Edit sheet (spec §10.3), newest first.
+ *  Pass an `eventType` to keep it to one category. */
+export async function getRecentEvents(
+  petId: string,
+  limit = 20,
+  eventType?: PetEventType,
+): Promise<DogEvent[]> {
   return db
     .select({
       id: petEvents.id,
@@ -68,9 +73,26 @@ export async function getRecentEvents(petId: string, limit = 20): Promise<DogEve
     })
     .from(petEvents)
     .innerJoin(members, eq(members.id, petEvents.recordedByMemberId))
-    .where(eq(petEvents.petId, petId))
+    .where(
+      eventType
+        ? and(eq(petEvents.petId, petId), eq(petEvents.eventType, eventType))
+        : eq(petEvents.petId, petId),
+    )
     .orderBy(desc(petEvents.occurredAt))
     .limit(limit);
+}
+
+/**
+ * The same history, but drawn per category so the sheet—which groups by
+ * category—has real depth in each one. A dog that went out twenty times
+ * yesterday would otherwise push every feed and poop off the end of a single
+ * flat top-20. Each query rides the (pet, type, occurred_at) index.
+ */
+export async function getRecentEventsByType(petId: string, perType = 12): Promise<DogEvent[]> {
+  const groups = await Promise.all(
+    PET_EVENT_TYPES.map((eventType) => getRecentEvents(petId, perType, eventType)),
+  );
+  return groups.flat();
 }
 
 /** Resolve a pet by slug, honouring the feature flag server-side. */

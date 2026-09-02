@@ -12,7 +12,7 @@ import {
   relativeTime,
   toCottageInputValue,
 } from "@/lib/time";
-import type { PetEventType } from "@/db/schema";
+import { PET_EVENT_TYPES, type PetEventType } from "@/db/schema";
 
 export type SheetEvent = {
   id: string;
@@ -21,10 +21,12 @@ export type SheetEvent = {
   recordedBy: string;
 };
 
+// Group headings, so the sheet reads as three short logs rather than one
+// interleaved stream — "when did she last eat" is a question about one column.
 const TYPE_LABEL: Record<PetEventType, string> = {
   outside: "Outside",
-  poop: "Poop",
-  fed: "Fed",
+  poop: "Poops",
+  fed: "Feeds",
 };
 
 export function EventSheet({
@@ -43,6 +45,14 @@ export function EventSheet({
   const [draft, setDraft] = useState("");
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+
+  // One log per category, newest first.
+  const groups = PET_EVENT_TYPES.map((type) => ({
+    type,
+    events: events
+      .filter((event) => event.eventType === type)
+      .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt)),
+  }));
 
   function beginEdit(event: SheetEvent) {
     setConfirmingId(null);
@@ -118,99 +128,122 @@ export function EventSheet({
               Nothing recorded yet. Tap one of the big buttons.
             </p>
           ) : (
-            <ul className="overflow-hidden rounded-xl border border-line">
-              {events.map((event) => {
-                const when = new Date(event.occurredAt);
-                const busy = busyId === event.id;
-                return (
-                  <li key={event.id} className="border-b border-line bg-card p-3 last:border-b-0">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="label text-muted">{TYPE_LABEL[event.eventType]}</p>
-                        <p className="mt-1 text-sm text-muted">
-                          <span className="font-bold text-ink">
-                            <RelativeTime iso={event.occurredAt} initial={relativeTime(when)} />
-                          </span>
-                          {" · "}
-                          {event.recordedBy}
-                        </p>
-                        {/* The exact stamp stays visible — this is where times get edited. */}
-                        <p className="mt-0.5 text-xs text-muted">
-                          {formatWeekday(when)} · {formatClock(when)}
-                        </p>
-                      </div>
-                      {editingId === event.id ? null : (
-                        <div className="flex shrink-0 gap-1">
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => beginEdit(event)}
-                            className="tap rounded-lg px-2 py-1 text-xs font-bold text-ink-soft transition-colors hover:text-ink disabled:opacity-50"
+            <div className="flex flex-col gap-5">
+              {groups.map((group) => (
+                <section key={group.type}>
+                  {/* The heading rides along as you scroll its own log, so you
+                      never lose track of which column you're reading. */}
+                  <h4 className="label sticky top-0 z-10 -mx-4 bg-paper px-4 pb-2 pt-1 text-muted">
+                    {TYPE_LABEL[group.type]}
+                  </h4>
+                  {group.events.length === 0 ? (
+                    <p className="rounded-xl border border-dashed border-line-strong px-4 py-5 text-center text-xs text-muted">
+                      Nothing recorded yet.
+                    </p>
+                  ) : (
+                    <ul className="overflow-hidden rounded-xl border border-line">
+                      {group.events.map((event) => {
+                        const when = new Date(event.occurredAt);
+                        const busy = busyId === event.id;
+                        return (
+                          <li
+                            key={event.id}
+                            className="border-b border-line bg-card p-3 last:border-b-0"
                           >
-                            Time
-                          </button>
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => setConfirmingId(event.id)}
-                            className="tap rounded-lg px-2 py-1 text-xs font-bold text-muted transition-colors hover:text-clay disabled:opacity-50"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      )}
-                    </div>
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="text-sm text-muted">
+                                  <span className="font-bold text-ink">
+                                    <RelativeTime
+                                      iso={event.occurredAt}
+                                      initial={relativeTime(when)}
+                                    />
+                                  </span>
+                                  {" · "}
+                                  {event.recordedBy}
+                                </p>
+                                {/* The exact stamp stays visible — this is where
+                                    times get edited. */}
+                                <p className="mt-0.5 text-xs text-muted">
+                                  {formatWeekday(when)} · {formatClock(when)}
+                                </p>
+                              </div>
+                              {editingId === event.id ? null : (
+                                <div className="flex shrink-0 gap-1">
+                                  <button
+                                    type="button"
+                                    disabled={busy}
+                                    onClick={() => beginEdit(event)}
+                                    className="tap rounded-lg px-2 py-1 text-xs font-bold text-ink-soft transition-colors hover:text-ink disabled:opacity-50"
+                                  >
+                                    Time
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={busy}
+                                    onClick={() => setConfirmingId(event.id)}
+                                    className="tap rounded-lg px-2 py-1 text-xs font-bold text-muted transition-colors hover:text-clay disabled:opacity-50"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              )}
+                            </div>
 
-                    {editingId === event.id ? (
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        <input
-                          type="datetime-local"
-                          value={draft}
-                          onChange={(e) => setDraft(e.target.value)}
-                          className="tap min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-base text-ink outline-none transition-colors focus:border-ink"
-                        />
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => saveEdit(event.id)}
-                          className="tap rounded-lg bg-ink px-4 py-2 text-xs font-extrabold text-paper disabled:opacity-30"
-                        >
-                          {busy ? "Saving…" : "Save"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setEditingId(null)}
-                          className="tap rounded-lg px-3 py-2 text-xs font-extrabold text-ink-soft"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    ) : null}
+                            {editingId === event.id ? (
+                              <div className="mt-3 flex flex-wrap items-center gap-2">
+                                <input
+                                  type="datetime-local"
+                                  value={draft}
+                                  onChange={(e) => setDraft(e.target.value)}
+                                  className="tap min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-base text-ink outline-none transition-colors focus:border-ink"
+                                />
+                                <button
+                                  type="button"
+                                  disabled={busy}
+                                  onClick={() => saveEdit(event.id)}
+                                  className="tap rounded-lg bg-ink px-4 py-2 text-xs font-extrabold text-paper disabled:opacity-30"
+                                >
+                                  {busy ? "Saving…" : "Save"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingId(null)}
+                                  className="tap rounded-lg px-3 py-2 text-xs font-extrabold text-ink-soft"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            ) : null}
 
-                    {confirmingId === event.id ? (
-                      <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg bg-subtle p-2">
-                        <span className="flex-1 text-sm text-ink">Delete this event?</span>
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => confirmDelete(event.id)}
-                          className="tap rounded-lg bg-clay px-4 py-2 text-xs font-extrabold text-white disabled:opacity-50"
-                        >
-                          {busy ? "Deleting…" : "Delete"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setConfirmingId(null)}
-                          className="tap rounded-lg px-3 py-2 text-xs font-extrabold text-ink-soft"
-                        >
-                          Keep
-                        </button>
-                      </div>
-                    ) : null}
-                  </li>
-                );
-              })}
-            </ul>
+                            {confirmingId === event.id ? (
+                              <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg bg-subtle p-2">
+                                <span className="flex-1 text-sm text-ink">Delete this event?</span>
+                                <button
+                                  type="button"
+                                  disabled={busy}
+                                  onClick={() => confirmDelete(event.id)}
+                                  className="tap rounded-lg bg-clay px-4 py-2 text-xs font-extrabold text-white disabled:opacity-50"
+                                >
+                                  {busy ? "Deleting…" : "Delete"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setConfirmingId(null)}
+                                  className="tap rounded-lg px-3 py-2 text-xs font-extrabold text-ink-soft"
+                                >
+                                  Keep
+                                </button>
+                              </div>
+                            ) : null}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </section>
+              ))}
+            </div>
           )}
         </div>
       </div>
