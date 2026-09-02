@@ -69,7 +69,7 @@ export async function getActiveFeedPosts(memberId: string): Promise<FeedPostRow[
 }
 
 /** Attach a short-lived presigned thumbnail URL to each post's attachment,
- *  same pattern as {@link import("./memories").withThumbnailUrls}. */
+ *  same pattern as {@link import("./memories").withViewUrls}. */
 export async function withPostThumbnailUrls(rows: FeedPostRow[]): Promise<FeedPostCard[]> {
   return Promise.all(
     rows.map(async (row) => ({

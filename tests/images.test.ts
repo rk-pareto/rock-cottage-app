@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFile } from "node:fs/promises";
 import sharp from "sharp";
-import { compressPhoto, processImage, toShareableJpeg } from "@/lib/storage/process";
+import { compressPhoto, DISPLAY_MAX_EDGE, processImage, toShareableJpeg } from "@/lib/storage/process";
 
 /**
  * The formats phones actually produce. HEIC matters most — it is the iPhone
@@ -39,7 +39,7 @@ describe("image processing", () => {
     const thumb = await sharp(result.thumbnail.buffer).metadata();
 
     // Longest edge is clamped, aspect ratio preserved.
-    expect(Math.max(display.width!, display.height!)).toBe(2560);
+    expect(Math.max(display.width!, display.height!)).toBe(DISPLAY_MAX_EDGE);
     expect(Math.max(thumb.width!, thumb.height!)).toBe(640);
     expect(display.width! / display.height!).toBeCloseTo(3200 / 2400, 2);
   });
@@ -130,7 +130,9 @@ describe("share encoding", () => {
     // WhatsApp would treat WebP as a sticker; JPEG is what every target takes.
     const metadata = await sharp(shared).metadata();
     expect(metadata.format).toBe("jpeg");
-    expect(metadata.width).toBe(2560);
-    expect(metadata.height).toBe(1920);
+    // Same pixels as the display copy it came from — 4:3, clamped on the
+    // long edge — only the container changed.
+    expect(metadata.width).toBe(DISPLAY_MAX_EDGE);
+    expect(metadata.height).toBe((DISPLAY_MAX_EDGE * 2400) / 3200);
   });
 });

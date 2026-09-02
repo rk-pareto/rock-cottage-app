@@ -8,6 +8,13 @@ export type LightboxItem = {
   kind: "image" | "video";
   uploadedBy: string;
   thumbnailUrl: string | null;
+  /** Presigned URL for the full-size copy — the display derivative of a photo,
+   *  the poster still of a video. Signed with the page, so the image is
+   *  fetched straight from the bucket rather than through
+   *  `/api/memories/[id]/view`, which has to check auth and look the row up
+   *  before it can even redirect there. Null while the derivative is still
+   *  being made; the route is the fallback either way. */
+  displayUrl: string | null;
 };
 
 /* The conveyor: neighbors are real, already-mounted panels on a sliding
@@ -327,7 +334,11 @@ export function Lightbox({
                       onTakeControl={() => setControlledId(item.id)}
                     />
                   ) : (
-                    <PhotoPane item={item} near={Math.abs(slot - index) <= 1} />
+                    <PhotoPane
+                      item={item}
+                      near={Math.abs(slot - index) <= 1}
+                      current={isCurrent}
+                    />
                   )}
                 </div>
               </div>
@@ -382,7 +393,17 @@ export function Lightbox({
  * display copy loads over it and fades in. A failed load keeps the blurred
  * still and offers a retry instead of the browser's broken-image glyph.
  */
-function PhotoPane({ item, near }: { item: LightboxItem; near: boolean }) {
+function PhotoPane({
+  item,
+  near,
+  current,
+}: {
+  item: LightboxItem;
+  near: boolean;
+  /** The one panel actually on screen — it gets the network ahead of its
+   *  neighbors, which are only being read ahead. */
+  current: boolean;
+}) {
   const [phase, setPhase] = useState<"loading" | "ready" | "error">("loading");
   // The blurred thumb stays under the full image until its fade-in finishes,
   // so there's never a frame of bare backdrop between the two.
@@ -394,9 +415,12 @@ function PhotoPane({ item, near }: { item: LightboxItem; near: boolean }) {
   if (near && !wantsFull) setWantsFull(true);
   const imgRef = useRef<HTMLImageElement | null>(null);
 
-  const src = wantsFull
-    ? `/api/memories/${item.id}/view${attempt > 0 ? `?retry=${attempt}` : ""}`
-    : null;
+  // The page's signed URL is good for minutes, not hours. Rather than guess
+  // whether this one is still live, take the fast path first and drop to the
+  // route — which signs a fresh one — the moment the bucket says no.
+  const [viaRoute, setViaRoute] = useState(item.displayUrl === null);
+  const routeSrc = `/api/memories/${item.id}/view${attempt > 0 ? `?retry=${attempt}` : ""}`;
+  const src = wantsFull ? (viaRoute ? routeSrc : item.displayUrl) : null;
 
   // A cache hit can complete before React attaches the load listener.
   useEffect(() => {
@@ -426,7 +450,12 @@ function PhotoPane({ item, near }: { item: LightboxItem; near: boolean }) {
           alt={`Added by ${item.uploadedBy}`}
           draggable={false}
           onLoad={() => setPhase("ready")}
-          onError={() => setPhase("error")}
+          onError={() => {
+            if (!viaRoute) setViaRoute(true);
+            else setPhase("error");
+          }}
+          fetchPriority={current ? "high" : "low"}
+          decoding="async"
           onTransitionEnd={(event) => {
             if (event.propertyName === "opacity" && phase === "ready") setRevealed(true);
           }}
@@ -511,7 +540,11 @@ function VideoPane({
   controlled: boolean;
   onTakeControl: () => void;
 }) {
-  const posterUrl = item.thumbnailUrl ? `/api/memories/${item.id}/view?variant=poster` : undefined;
+  // The poster *is* the display copy for a video, so the page's signed URL
+  // covers it; the route stays the fallback for a still not yet made.
+  const posterUrl =
+    item.displayUrl ??
+    (item.thumbnailUrl ? `/api/memories/${item.id}/view?variant=poster` : undefined);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const reducedMotion = useReducedMotion();
   // A browser can still say no — data saver, low power mode, a site setting.

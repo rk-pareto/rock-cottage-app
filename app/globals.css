@@ -63,8 +63,14 @@ main {
   }
 }
 
+/* `backwards`, never `both`: a filling *forwards* transform animation keeps
+   `main` a containing block for fixed-position descendants forever, which
+   lays the photo viewer out over the whole page instead of the viewport —
+   its top bar ends up above the scroll and its footer below it. The forwards
+   half was doing nothing anyway; the end keyframe is `main`'s own resting
+   style. */
 main {
-  animation: page-in 0.26s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  animation: page-in 0.26s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
 }
 
 /* The brief "recorded" checkmark that replaces a dog action's + badge. */

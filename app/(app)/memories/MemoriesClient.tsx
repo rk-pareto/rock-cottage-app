@@ -22,6 +22,8 @@ export type MemoryCardData = {
   uploadedByMemberId: string;
   processingStatus: string;
   thumbnailUrl: string | null;
+  /** Presigned full-size copy, so the viewer loads straight from the bucket. */
+  displayUrl: string | null;
   durationLabel: string | null;
   /** False for clips too large to hand to the OS share sheet in one piece. */
   shareable: boolean;

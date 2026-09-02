@@ -27,7 +27,12 @@ export type MemoryRow = {
   durationSeconds: number | null;
 };
 
-export type MemoryCard = MemoryRow & { thumbnailUrl: string | null };
+export type MemoryCard = MemoryRow & {
+  thumbnailUrl: string | null;
+  /** The full-size copy the viewer shows: the display derivative on a photo,
+   *  the poster still on a video. */
+  displayUrl: string | null;
+};
 
 function selectMemories() {
   return db
@@ -67,16 +72,24 @@ export async function getReadyMemories(limit = 6): Promise<MemoryRow[]> {
 }
 
 /**
- * Attach short-lived presigned thumbnail URLs. The bucket stays private —
+ * Attach short-lived presigned URLs for both sizes. The bucket stays private —
  * these expire, and the page re-renders every 30 seconds anyway. A video's
  * thumbnail is the still made from its poster frame, so this is the same
  * lookup either way.
+ *
+ * The display copy is signed here rather than fetched through
+ * `/api/memories/[id]/view`, so opening a photo goes straight at the bucket
+ * instead of waiting on a round trip through the app — auth, a row lookup and
+ * a redirect — before the first byte of the image moves. The route stays as
+ * the fallback for a signature that has since expired.
  */
-export async function withThumbnailUrls(rows: MemoryRow[]): Promise<MemoryCard[]> {
+export async function withViewUrls(rows: MemoryRow[]): Promise<MemoryCard[]> {
+  const sign = (key: string | null) => (key ? presignView(key).catch(() => null) : null);
   return Promise.all(
     rows.map(async (row) => ({
       ...row,
-      thumbnailUrl: row.thumbnailKey ? await presignView(row.thumbnailKey).catch(() => null) : null,
+      thumbnailUrl: await sign(row.thumbnailKey),
+      displayUrl: await sign(row.displayKey),
     })),
   );
 }

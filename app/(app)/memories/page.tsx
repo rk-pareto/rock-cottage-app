@@ -7,7 +7,7 @@ import {
   getMemories,
   hasPlaybackCopy,
   isShareable,
-  withThumbnailUrls,
+  withViewUrls,
 } from "@/lib/memories";
 import { isStorageConfigured } from "@/lib/storage/s3";
 import { MemoriesClient } from "./MemoriesClient";
@@ -21,7 +21,7 @@ export default async function MemoriesPage() {
     storageReady ? getMemories() : Promise.resolve([]),
     getFavoriteMemoryIds(member.id),
   ]);
-  const rows = storageReady ? await withThumbnailUrls(memories) : [];
+  const rows = storageReady ? await withViewUrls(memories) : [];
 
   return (
     <>
@@ -35,6 +35,7 @@ export default async function MemoriesPage() {
           uploadedByMemberId: r.uploadedByMemberId,
           processingStatus: r.processingStatus,
           thumbnailUrl: r.thumbnailUrl,
+          displayUrl: r.displayUrl,
           durationLabel: formatDuration(r.durationSeconds),
           shareable: isShareable(r),
           hasPlaybackCopy: hasPlaybackCopy(r),

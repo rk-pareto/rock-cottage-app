@@ -9,7 +9,16 @@ export type ProcessedImage = {
   height: number | null;
 };
 
-const DISPLAY_MAX_EDGE = 2560;
+/**
+ * The full-size copy the viewer shows and "Download optimized" hands over.
+ *
+ * Sized for the screens this is actually looked at on: the widest phone in the
+ * house is 1179 device pixels across, and the viewer never shows a photo wider
+ * than the screen. 2560 was three times the pixels anyone could see and made
+ * opening a photo on cottage wifi a visible wait. The original is kept
+ * untouched either way, so nothing is lost — it is one download away.
+ */
+export const DISPLAY_MAX_EDGE = 1600;
 const DISPLAY_QUALITY = 85;
 const THUMBNAIL_MAX_EDGE = 640;
 const THUMBNAIL_QUALITY = 78;

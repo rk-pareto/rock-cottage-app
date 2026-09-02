@@ -122,6 +122,7 @@ production, so magic links can't be redirected off-site.
 | `npm run db:generate` | Generate a migration after editing `db/schema.ts` |
 | `npm run db:migrate` | Apply migrations |
 | `npm run db:seed` | Seed members, pets, meals, assignments (idempotent) |
+| `npm run media:reprocess` | Rebuild every photo's display/thumbnail copies from the kept originals — run after changing the sizes in `lib/storage/process.ts`. `-- --dry-run` reports without writing |
 | `npm test` | Business-rule tests |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |

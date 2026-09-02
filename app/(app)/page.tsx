@@ -22,7 +22,7 @@ import {
   getUpcomingMeals,
   type MealRow,
 } from "@/lib/meals";
-import { formatDuration, getReadyMemories, withThumbnailUrls } from "@/lib/memories";
+import { formatDuration, getReadyMemories, withViewUrls } from "@/lib/memories";
 import { getOpenShoppingItems, getRecentPickupActivity, type PickupActivity } from "@/lib/shopping";
 import { formatStayTime, stayEventsFor, type StayEvent } from "@/lib/stay";
 import { isStorageConfigured } from "@/lib/storage/s3";
@@ -74,7 +74,7 @@ export default async function HomePage() {
   // Only the drawn memories get presigned URLs — no point signing the pool.
   const seed = memoryDrawSeed();
   const drawn = pickSeeded(memoryPool, memoryDrawCount(memoryPool.length, seed), seed);
-  const memories = drawn.length > 0 ? await withThumbnailUrls(drawn) : [];
+  const memories = drawn.length > 0 ? await withViewUrls(drawn) : [];
   const today = cottageToday();
   const feed = withStayEvents(
     interleaveFeed(meals, memories),
@@ -87,6 +87,7 @@ export default async function HomePage() {
     kind: memory.kind,
     uploadedBy: memory.uploadedBy,
     thumbnailUrl: memory.thumbnailUrl,
+    displayUrl: memory.displayUrl,
   }));
 
   return (

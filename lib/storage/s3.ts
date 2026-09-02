@@ -6,6 +6,7 @@ import { pipeline } from "node:stream/promises";
 import {
   DeleteObjectsCommand,
   GetObjectCommand,
+  HeadObjectCommand,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
@@ -56,6 +57,25 @@ function s3(): S3Client {
 /** Short-lived URLs only — no permanent public bucket URLs (spec §14.7). */
 const UPLOAD_URL_TTL_SECONDS = 15 * 60;
 const DOWNLOAD_URL_TTL_SECONDS = 12 * 60;
+const VIEW_URL_TTL_SECONDS = 15 * 60;
+/**
+ * View URLs are signed as of the start of the current five-minute block
+ * rather than "now", so the same key signs to the *same URL* for everyone
+ * who asks within that block.
+ *
+ * That is what makes the browser cache work at all: the home page and the
+ * gallery re-render every 30 seconds (see `AutoRefresh`), and a signature
+ * stamped with the current second would hand back a brand-new URL each time
+ * — a cache miss, and a full re-download of every thumbnail on screen, twice
+ * a minute.
+ *
+ * The block is deliberately shorter than the TTL: the oldest URL a render can
+ * hand out still has `VIEW_URL_TTL_SECONDS - VIEW_URL_SIGNING_BLOCK_SECONDS`
+ * (10 minutes) of life left, which is exactly how long the browser is told to
+ * cache the bytes below — so a cached image never outlives its own signature.
+ */
+const VIEW_URL_SIGNING_BLOCK_SECONDS = 5 * 60;
+const VIEW_CACHE_SECONDS = VIEW_URL_TTL_SECONDS - VIEW_URL_SIGNING_BLOCK_SECONDS;
 
 export function presignUpload(key: string, contentType: string): Promise<string> {
   return getSignedUrl(
@@ -81,6 +101,7 @@ export function presignDownload(key: string, downloadFilename?: string): Promise
 
 /** Inline (no attachment header) — used for in-app viewing of derivatives. */
 export function presignView(key: string): Promise<string> {
+  const block = VIEW_URL_SIGNING_BLOCK_SECONDS * 1000;
   return getSignedUrl(
     s3(),
     new GetObjectCommand({
@@ -88,9 +109,12 @@ export function presignView(key: string): Promise<string> {
       Key: key,
       // The bucket sets no cache headers of its own; without this the browser
       // guesses, and the lightbox re-downloads photos it showed seconds ago.
-      ResponseCacheControl: "private, max-age=600",
+      ResponseCacheControl: `private, max-age=${VIEW_CACHE_SECONDS}`,
     }),
-    { expiresIn: DOWNLOAD_URL_TTL_SECONDS },
+    {
+      expiresIn: VIEW_URL_TTL_SECONDS,
+      signingDate: new Date(Math.floor(Date.now() / block) * block),
+    },
   );
 }
 
@@ -109,6 +133,16 @@ export async function putObjectBytes(
   await s3().send(
     new PutObjectCommand({ Bucket: BUCKET_NAME, Key: key, Body: body, ContentType: contentType }),
   );
+}
+
+/** Bytes an object occupies, or null if it isn't there. */
+export async function objectSize(key: string): Promise<number | null> {
+  try {
+    const head = await s3().send(new HeadObjectCommand({ Bucket: BUCKET_NAME, Key: key }));
+    return head.ContentLength ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export async function deleteObjects(keys: string[]): Promise<void> {

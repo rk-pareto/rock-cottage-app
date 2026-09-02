@@ -38,6 +38,7 @@ import {
   formatStayTime,
   stayEventsFor,
 } from "@/lib/stay";
+import { isStorageConfigured, presignView } from "@/lib/storage/s3";
 
 const original = process.env.FEATURE_JUNO_ENABLED;
 afterEach(() => {
@@ -505,5 +506,43 @@ describe("intro tour", () => {
       expect(step.body.length).toBeGreaterThan(0);
       expect(step.label.length).toBeGreaterThan(0);
     }
+  });
+});
+
+/**
+ * Signing is local arithmetic — no bucket is touched here — but it needs
+ * credentials to be present at all.
+ */
+describe.skipIf(!isStorageConfigured())("presigned view URLs", () => {
+  it("hands back the same URL for a key within a signing block", async () => {
+    // Two renders a second apart — which is what the 30s auto-refresh does all
+    // day. A URL that changed here would miss the browser cache every time and
+    // re-download every photo on screen.
+    const first = await presignView("memories/abc/display.webp");
+    const second = await presignView("memories/abc/display.webp");
+    expect(second).toBe(first);
+  });
+
+  it("still signs different keys differently", async () => {
+    const display = await presignView("memories/abc/display.webp");
+    const thumbnail = await presignView("memories/abc/thumbnail.webp");
+    expect(thumbnail).not.toBe(display);
+  });
+
+  it("outlives the cache lifetime it advertises", async () => {
+    // The signature has to stay valid for at least as long as the browser is
+    // told to keep the bytes, or a cached photo can come back as a 403.
+    const url = new URL(await presignView("memories/abc/display.webp"));
+    const signedAt = url.searchParams.get("X-Amz-Date")!;
+    const expiresIn = Number(url.searchParams.get("X-Amz-Expires"));
+    const cacheSeconds = Number(
+      /max-age=(\d+)/.exec(url.searchParams.get("response-cache-control") ?? "")![1],
+    );
+    // `20240101T000000Z` → parseable.
+    const signedMs = Date.parse(
+      signedAt.replace(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/, "$1-$2-$3T$4:$5:$6Z"),
+    );
+    const remaining = (signedMs + expiresIn * 1000 - Date.now()) / 1000;
+    expect(remaining).toBeGreaterThanOrEqual(cacheSeconds);
   });
 });
