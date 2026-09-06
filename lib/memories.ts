@@ -1,5 +1,5 @@
 import "server-only";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { media, members, memoryFavorites, type MediaKind } from "@/db/schema";
 import { UPLOAD_NEVER_LANDED } from "@/lib/storage/derivatives";
@@ -113,6 +113,16 @@ export async function getFavoriteMemoryIds(memberId: string): Promise<Set<string
 export async function getMemoryById(id: string) {
   const [row] = await db.select().from(media).where(eq(media.id, id)).limit(1);
   return row ?? null;
+}
+
+/**
+ * Whole rows for a selection of memories, newest first — the same order the
+ * grid shows them in, so a bulk download unzips in the order it was picked.
+ * Ids that don't exist are simply absent from the result.
+ */
+export async function getMemoriesByIds(ids: string[]) {
+  if (ids.length === 0) return [];
+  return db.select().from(media).where(inArray(media.id, ids)).orderBy(desc(media.createdAt));
 }
 
 /**

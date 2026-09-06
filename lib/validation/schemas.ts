@@ -77,6 +77,23 @@ export const MAX_VIDEO_BYTES = 512 * 1024 * 1024; // 512 MB — a couple of minu
  */
 export const MAX_SHAREABLE_VIDEO_BYTES = 64 * 1024 * 1024;
 
+/**
+ * How many memories one bulk download may ask for. Comfortably past "select
+ * all" — the gallery itself only ever hands the grid 200 rows — and low enough
+ * that a hand-made request can't ask the container to stream the whole bucket.
+ */
+export const MAX_BULK_DOWNLOAD_ITEMS = 300;
+
+/**
+ * What the Memories screen posts when someone downloads a selection.
+ * `original` is the untouched upload; `compressed` is the app's own derivative
+ * (a photo's display WebP, a clip's transcoded MP4).
+ */
+export const bulkDownloadSchema = z.object({
+  variant: z.enum(["original", "compressed"]),
+  ids: z.array(uuidSchema).min(1).max(MAX_BULK_DOWNLOAD_ITEMS),
+});
+
 export type UploadKind = "image" | "video";
 
 export function kindForContentType(contentType: string): UploadKind | null {

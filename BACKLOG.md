@@ -41,3 +41,4 @@ A living backlog of ideas, feature requests, bug fixes, and polish items for the
 - [x] Feed posts — anyone can pin a text/photo/video message to the top of Home; per-member dismiss, author/admin delete for everyone
 - [x] AI meal descriptions — renaming a meal regenerates its fancy description via Ollama's cloud API
 - [x] Shopping list photos — attach one compressed photo to an item so people can see which one you mean
+- [x] Bulk select and download on Memories — hold a tile or tap Select, then take the whole selection as a ZIP of originals or of compressed copies

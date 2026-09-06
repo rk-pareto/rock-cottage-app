@@ -246,6 +246,46 @@ or Nixpacks change (`FFMPEG_PATH` / `FFPROBE_PATH` override them).
 - Retry a `failed` pass by setting `playback_status` back to `pending` and
   restarting.
 
+### Selecting and downloading in bulk
+
+Hold any tile — or tap **Select** beside the All/Favorites tabs — and the grid
+becomes a picker: a checkbox per tile, **Select all**, and a bar that takes the
+bottom nav's place while it lasts. Selection follows the tab, so "select all"
+under Favorites means the favorites.
+
+Two ways out, matching what the viewer offers for a single memory:
+
+- **Originals** — the untouched uploads, with their combined weight on the
+  button, because on a phone that number is the whole decision.
+- **Compressed** — the app's own derivatives: a photo's `display.webp`, a
+  clip's playback MP4. Where there is no smaller copy it falls back to the
+  original rather than dropping the memory from the batch; a clip is only left
+  untranscoded when it was already an ordinary, sensibly sized MP4.
+
+`POST /api/memories/download` answers with a ZIP built by
+`lib/storage/archive.ts`, or — for a selection of one — a redirect to the
+presigned file itself, since one memory is not an archive.
+
+The archive **streams**. Each object is piped from the bucket to the client one
+at a time with its CRC computed on the way past, using ZIP's data descriptor to
+write the checksum and size *after* the data; nothing is ever held in memory,
+and an entry whose object can't be opened is left out rather than failing the
+other thirty-nine. Entries are stored, never deflated — HEIC, JPEG, WebP and
+MP4 are already compressed, and deflating them would burn CPU to make the
+archive slightly bigger. Zip64 records appear only if a selection actually
+pushes past a 32-bit offset. Colliding filenames (two phones, one `IMG_0042`)
+get a counter.
+
+It is a submitted form rather than `fetch()`: "select all" is more ids than a
+URL will carry, and the browser has to stream the reply straight to disk. That
+also decides the error shape — the browser is *navigating*, so a JSON error
+body would replace the app with a page of JSON. Every failure before the first
+byte redirects back to `/memories?download=<reason>`, which the client turns
+into a toast and wipes from the URL.
+
+Covered by `tests/archive.test.ts`, which unpacks what the writer produces with
+the system `unzip`.
+
 The argument builder and the skip rule are pure and covered by
 `tests/video.test.ts`. An end-to-end encode is opt-in:
 

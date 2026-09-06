@@ -2,6 +2,7 @@
 
 import {
   useCallback,
+  useEffect,
   useRef,
   useState,
   useSyncExternalStore,
@@ -10,7 +11,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import { deleteMemory, toggleFavorite } from "./actions";
-import { HeartGlyph, PlayGlyph } from "@/components/ui/icons";
+import { Check, HeartGlyph, PlayGlyph } from "@/components/ui/icons";
 import { Lightbox } from "@/components/memories/Lightbox";
 import { placeholderLabel } from "@/lib/memoryStatus";
 import { supportsFileSharing, uploadMedia } from "@/lib/uploads/browser";
@@ -31,6 +32,9 @@ export type MemoryCardData = {
   durationLabel: string | null;
   /** False for clips too large to hand to the OS share sheet in one piece. */
   shareable: boolean;
+  /** Bytes of the untouched upload, for the running total on the bulk
+   *  download button. */
+  originalBytes: number;
   /** Whether a transcoded MP4 exists: false on an image, on a clip that was
    *  already an ordinary MP4, and until the pass lands. Decides both the
    *  optimized download and what `/share` will name its bytes. */
@@ -88,6 +92,98 @@ export function MemoriesClient({
   // False during SSR, so the button appears only once hydration has asked the
   // browser — no markup mismatch.
   const canShareFiles = useSyncExternalStore(subscribeNever, supportsFileSharing, () => false);
+  /**
+   * Bulk select. `null` is "not selecting" — one piece of state rather than a
+   * flag and a set that could disagree. Ids only: the tiles themselves come
+   * and go as the page refreshes underneath.
+   */
+  const [selectedIds, setSelectedIds] = useState<Set<string> | null>(null);
+  const longPress = useRef<number | null>(null);
+  const longPressFrom = useRef<{ x: number; y: number } | null>(null);
+  // A long press ends in a click on whatever is under the finger by then —
+  // the checkbox it just turned on. Without this, holding a tile would select
+  // it and immediately deselect it again.
+  const swallowClick = useRef(false);
+
+  const beginSelecting = useCallback((firstId?: string) => {
+    setLightboxId(null);
+    setSelectedIds(new Set(firstId ? [firstId] : []));
+  }, []);
+
+  const stopSelecting = useCallback(() => setSelectedIds(null), []);
+
+  const toggleSelected = useCallback((id: string) => {
+    setSelectedIds((current) => {
+      if (!current) return current;
+      const next = new Set(current);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+  }, []);
+
+  /** True once, immediately after a hold became a selection: the click that
+   *  trails a long press lands on whatever is under the finger by then, and
+   *  must not undo the tile it just picked. */
+  const swallowedLongPressClick = useCallback(() => {
+    if (!swallowClick.current) return false;
+    swallowClick.current = false;
+    return true;
+  }, []);
+
+  const cancelLongPress = useCallback(() => {
+    if (longPress.current !== null) window.clearTimeout(longPress.current);
+    longPress.current = null;
+    longPressFrom.current = null;
+  }, []);
+
+  /** Hold a tile to start selecting — the gesture every phone gallery uses.
+   *  The Select button beside the tabs is the same thing for a mouse. */
+  const startLongPress = useCallback(
+    (event: React.TouchEvent, memory: MemoryCardData) => {
+      if (selectedIds || memory.uploadIncomplete) return;
+      const touch = event.touches[0];
+      if (!touch) return;
+      longPressFrom.current = { x: touch.clientX, y: touch.clientY };
+      longPress.current = window.setTimeout(() => {
+        longPress.current = null;
+        swallowClick.current = true;
+        // Belt and braces: if the click never arrives, the guard must not sit
+        // there waiting to eat someone's next real tap.
+        window.setTimeout(() => {
+          swallowClick.current = false;
+        }, 600);
+        navigator.vibrate?.(8);
+        beginSelecting(memory.id);
+      }, LONG_PRESS_MS);
+    },
+    [selectedIds, beginSelecting],
+  );
+
+  /** A finger that has travelled is scrolling the grid, not holding a tile. */
+  const moveLongPress = useCallback(
+    (event: React.TouchEvent) => {
+      const start = longPressFrom.current;
+      const touch = event.touches[0];
+      if (!start || !touch) return;
+      if (Math.abs(touch.clientX - start.x) > 10 || Math.abs(touch.clientY - start.y) > 10) {
+        cancelLongPress();
+      }
+    },
+    [cancelLongPress],
+  );
+
+  useEffect(() => cancelLongPress, [cancelLongPress]);
+
+  /**
+   * A bulk download is a form navigation, so there is no response for this
+   * code to read — a failure comes back as a redirect carrying its reason.
+   */
+  useEffect(() => {
+    const reason = new URLSearchParams(window.location.search).get("download");
+    if (!reason) return;
+    window.history.replaceState(null, "", window.location.pathname);
+    toast(DOWNLOAD_ERRORS[reason] ?? DOWNLOAD_ERRORS.error, "error");
+  }, [toast]);
 
   const patch = useCallback((key: string, changes: Partial<UploadState>) => {
     setUploads((current) => current.map((u) => (u.key === key ? { ...u, ...changes } : u)));
@@ -179,6 +275,13 @@ export function MemoriesClient({
   }, []);
 
   function showMemory(memory: MemoryCardData) {
+    // Reachable while selecting: from the keyboard, since the tile's own
+    // button stays focusable under the checkbox overlay, and from the trailing
+    // click of the hold that started the selection in the first place.
+    if (selectedIds) {
+      if (!swallowedLongPressClick()) toggleSelected(memory.id);
+      return;
+    }
     setLightboxId(memory.id);
     setConfirmingId(null);
     // Only prefetch a still: pulling a whole clip down for a share nobody
@@ -265,6 +368,52 @@ export function MemoriesClient({
   const lightboxIndex = visibleMemories.findIndex((m) => m.id === lightboxId);
   const lightboxMemory = lightboxIndex >= 0 ? visibleMemories[lightboxIndex] : null;
 
+  // Selection follows the tab too: what "Select all" means, and what a
+  // download hands over, is whatever is actually on screen.
+  const selectableMemories = visibleMemories.filter((m) => !m.uploadIncomplete);
+  const selectedMemories = selectedIds
+    ? selectableMemories.filter((m) => selectedIds.has(m.id))
+    : [];
+  const allSelected =
+    selectableMemories.length > 0 && selectedMemories.length === selectableMemories.length;
+  const selectedBytes = selectedMemories.reduce((total, m) => total + m.originalBytes, 0);
+
+  /**
+   * Hand the selection to `/api/memories/download`.
+   *
+   * A submitted form rather than `fetch()`: "select all" is more ids than a
+   * URL will carry, and the reply is an archive the browser has to stream
+   * straight to disk. Reading it into a Blob first would ask a phone to hold
+   * gigabytes of video in memory.
+   */
+  function downloadSelected(variant: "original" | "compressed") {
+    if (selectedMemories.length === 0) return;
+
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = "/api/memories/download";
+    form.hidden = true;
+    const field = (name: string, value: string) => {
+      const input = document.createElement("input");
+      input.type = "hidden";
+      input.name = name;
+      input.value = value;
+      form.appendChild(input);
+    };
+    field("variant", variant);
+    for (const memory of selectedMemories) field("id", memory.id);
+    document.body.appendChild(form);
+    form.submit();
+    form.remove();
+
+    toast(
+      selectedMemories.length === 1
+        ? "Downloading…"
+        : `Packing ${selectedMemories.length} memories…`,
+    );
+    stopSelecting();
+  }
+
   return (
     <>
       <input
@@ -284,6 +433,7 @@ export function MemoriesClient({
       />
       <button
         type="button"
+        hidden={selectedIds !== null}
         disabled={!storageReady}
         onClick={() => fileInput.current?.click()}
         className="tap mb-5 flex w-full items-center justify-center gap-2 rounded-xl bg-ink px-4 py-3.5 text-[0.9375rem] font-extrabold tracking-tight text-paper transition active:scale-[0.99] disabled:opacity-30"
@@ -352,19 +502,40 @@ export function MemoriesClient({
       ) : null}
 
       {memories.length > 0 ? (
-        <div className="mb-4 inline-flex rounded-full border border-line bg-subtle p-1">
-          {(["all", "favorites"] as const).map((value) => (
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="inline-flex rounded-full border border-line bg-subtle p-1">
+            {(["all", "favorites"] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => {
+                  setTab(value);
+                  // A selection made under All would silently keep memories
+                  // the Favorites grid isn't showing.
+                  stopSelecting();
+                }}
+                className={`label rounded-full px-3.5 py-1.5 transition-colors ${
+                  tab === value ? "bg-ink text-paper" : "text-muted"
+                }`}
+              >
+                {value === "all" ? "All" : "Favorites"}
+              </button>
+            ))}
+          </div>
+          {selectableMemories.length > 0 ? (
             <button
-              key={value}
               type="button"
-              onClick={() => setTab(value)}
-              className={`label rounded-full px-3.5 py-1.5 transition-colors ${
-                tab === value ? "bg-ink text-paper" : "text-muted"
-              }`}
+              onClick={() => {
+                if (!selectedIds) return beginSelecting();
+                setSelectedIds(
+                  allSelected ? new Set() : new Set(selectableMemories.map((m) => m.id)),
+                );
+              }}
+              className="tap -mr-2 shrink-0 px-2 text-xs font-extrabold tracking-tight text-ink"
             >
-              {value === "all" ? "All" : "Favorites"}
+              {!selectedIds ? "Select" : allSelected ? "Clear" : "Select all"}
             </button>
-          ))}
+          ) : null}
         </div>
       ) : null}
 
@@ -375,9 +546,19 @@ export function MemoriesClient({
             : "Nothing here yet. Someone go take a picture of the lake."}
         </p>
       ) : (
-        <ul className="grid grid-cols-3 gap-1">
+        <ul className={`grid grid-cols-3 gap-1 ${selectedIds ? "pb-24" : ""}`}>
           {visibleMemories.map((memory) => (
-            <li key={memory.id} className="relative aspect-square">
+            <li
+              key={memory.id}
+              className="relative aspect-square select-none"
+              onTouchStart={(event) => startLongPress(event, memory)}
+              onTouchMove={moveLongPress}
+              onTouchEnd={cancelLongPress}
+              onTouchCancel={cancelLongPress}
+              // iOS raises its own image callout at almost exactly the moment
+              // the hold becomes a selection, and the two fight each other.
+              onContextMenu={(event) => event.preventDefault()}
+            >
               {/* A clip whose poster never made it is still openable once its
                   bytes have landed — it just has no still to show. */}
               {memory.thumbnailUrl ||
@@ -394,7 +575,7 @@ export function MemoriesClient({
                         src={memory.thumbnailUrl}
                         alt={`Added by ${memory.uploadedBy}`}
                         loading="lazy"
-                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+                        className="h-full w-full object-cover transition-transform duration-500 [-webkit-touch-callout:none] group-hover:scale-[1.04]"
                       />
                     ) : (
                       <span className="flex h-full w-full items-center justify-center text-line-strong">
@@ -446,10 +627,92 @@ export function MemoriesClient({
                   ) : null}
                 </div>
               )}
+
+              {/* While selecting, one button covers the whole tile: it takes
+                  the tap that would otherwise open the viewer, and the ones
+                  meant for the heart and the Delete link underneath. */}
+              {selectedIds ? (
+                memory.uploadIncomplete ? (
+                  // Nothing of this one reached the bucket, so there is
+                  // nothing an archive could carry.
+                  <span aria-hidden="true" className="absolute inset-0 rounded-lg bg-paper/65" />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!swallowedLongPressClick()) toggleSelected(memory.id);
+                    }}
+                    aria-pressed={selectedIds.has(memory.id)}
+                    aria-label={`${selectedIds.has(memory.id) ? "Deselect" : "Select"} the ${
+                      memory.kind === "video" ? "video" : "photo"
+                    } added by ${memory.uploadedBy}`}
+                    className={`absolute inset-0 rounded-lg transition ${
+                      selectedIds.has(memory.id) ? "bg-ink/15 ring-2 ring-pine ring-inset" : ""
+                    }`}
+                  >
+                    <span
+                      className={`absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full border backdrop-blur-sm ${
+                        selectedIds.has(memory.id)
+                          ? "border-pine bg-pine text-white"
+                          : "border-white/70 bg-ink/25 text-transparent"
+                      }`}
+                    >
+                      <Check className="h-3.5 w-3.5" />
+                    </span>
+                  </button>
+                )
+              ) : null}
             </li>
           ))}
         </ul>
       )}
+
+      {/* Takes the bottom nav's place entirely while selecting, the way a
+          phone gallery does — the tabs are not what this moment is about. */}
+      {selectedIds ? (
+        <div className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-card">
+          <div className="mx-auto max-w-3xl px-4 py-3 safe-bottom">
+            <div className="mb-2.5 flex items-center justify-between gap-3">
+              <span className="label text-muted">
+                {selectedMemories.length === 0
+                  ? "Nothing selected"
+                  : `${selectedMemories.length} selected`}
+              </span>
+              <button
+                type="button"
+                onClick={stopSelecting}
+                className="tap -mr-2 px-2 text-xs font-extrabold tracking-tight text-muted"
+              >
+                Cancel
+              </button>
+            </div>
+            <div className="flex gap-2">
+              {/* The originals are the copies this app treats as sacred, so
+                  they lead — with their weight attached, because on a phone
+                  that number is the whole decision. */}
+              <button
+                type="button"
+                disabled={selectedMemories.length === 0}
+                onClick={() => downloadSelected("original")}
+                className="tap flex-1 rounded-xl bg-ink px-4 py-3 text-xs font-extrabold tracking-tight text-paper transition active:scale-[0.99] disabled:opacity-30"
+              >
+                Originals
+                {selectedBytes > 0 ? (
+                  <span className="font-bold opacity-60"> · {formatBytes(selectedBytes)}</span>
+                ) : null}
+              </button>
+              <button
+                type="button"
+                disabled={selectedMemories.length === 0}
+                onClick={() => downloadSelected("compressed")}
+                className="tap flex-1 rounded-xl border border-line-strong px-4 py-3 text-xs font-extrabold tracking-tight text-ink transition active:scale-[0.99] disabled:opacity-30"
+              >
+                Compressed
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {lightboxMemory ? (
         <Lightbox
@@ -549,3 +812,21 @@ export function MemoriesClient({
 
 
 const subscribeNever = () => () => {};
+
+/** How long a tile has to be held before the grid turns into a picker. */
+const LONG_PRESS_MS = 450;
+
+/** Why a bulk download bounced back — see the route's `back()`. */
+const DOWNLOAD_ERRORS: Record<string, string> = {
+  "signed-out": "You're signed out. Sign in and try again.",
+  empty: "Those memories aren't in the bucket to download.",
+  error: "Couldn't start that download. Try again.",
+};
+
+/** Rough weight for the download button — a hint, not an invoice. */
+function formatBytes(bytes: number): string {
+  const mb = bytes / (1024 * 1024);
+  if (mb < 1) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  if (mb >= 1024) return `${(mb / 1024).toFixed(1)} GB`;
+  return `${Math.round(mb)} MB`;
+}

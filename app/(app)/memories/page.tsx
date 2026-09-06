@@ -40,6 +40,7 @@ export default async function MemoriesPage() {
           displayUrl: r.displayUrl,
           durationLabel: formatDuration(r.durationSeconds),
           shareable: isShareable(r),
+          originalBytes: r.originalBytes,
           hasPlaybackCopy: hasPlaybackCopy(r),
           createdAt: r.createdAt.toISOString(),
           favorited: favoriteIds.has(r.id),
