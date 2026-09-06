@@ -3,6 +3,13 @@ import { introSteps } from "@/lib/intro/steps";
 import { isLockedOut, LOCKOUT_MS } from "@/lib/dogLock";
 import { placeholderLabel } from "@/lib/memoryStatus";
 import {
+  canSkipOwn,
+  matchedScope,
+  partitionByUploader,
+  scopeMemories,
+  SELECT_SCOPES,
+} from "@/lib/memorySelection";
+import {
   dogsNavLabel,
   enabledPetSlugs,
   features,
@@ -592,5 +599,58 @@ describe("memory tile placeholder", () => {
 
   it("falls back to no preview for a ready memory with no tile", () => {
     expect(tile("ready")).toBe("No preview");
+  });
+});
+
+describe("bulk select scopes", () => {
+  const ME = "member-me";
+  // Two of mine, three of everyone else's — the ordinary end-of-week shape.
+  const mine = [{ uploadedByMemberId: ME }, { uploadedByMemberId: ME }];
+  const theirs = [
+    { uploadedByMemberId: "member-a" },
+    { uploadedByMemberId: "member-b" },
+    { uploadedByMemberId: "member-a" },
+  ];
+  const grid = [...mine, ...theirs];
+
+  it("splits a list by who uploaded each memory", () => {
+    const { own, others } = partitionByUploader(grid, ME);
+    expect(own).toHaveLength(2);
+    expect(others).toHaveLength(3);
+    expect(others.every((m) => m.uploadedByMemberId !== ME)).toBe(true);
+  });
+
+  it("selects everything, everyone else's, or nothing", () => {
+    expect(scopeMemories(grid, "all", ME)).toHaveLength(5);
+    expect(scopeMemories(grid, "others", ME)).toEqual(theirs);
+    expect(scopeMemories(grid, "none", ME)).toEqual([]);
+  });
+
+  it("offers Not mine only when it would mean something different", () => {
+    expect(canSkipOwn(grid, ME)).toBe(true);
+    // Nothing of yours on screen: "not mine" is "all" under another name.
+    expect(canSkipOwn(theirs, ME)).toBe(false);
+    // Nothing but yours: it would select nothing at all.
+    expect(canSkipOwn(mine, ME)).toBe(false);
+    expect(canSkipOwn([], ME)).toBe(false);
+  });
+
+  it("recognises which scope the current selection matches", () => {
+    expect(matchedScope([], grid, ME)).toBe("none");
+    expect(matchedScope(grid, grid, ME)).toBe("all");
+    expect(matchedScope(theirs, grid, ME)).toBe("others");
+    // A hand-picked subset is none of the three.
+    expect(matchedScope(theirs.slice(0, 2), grid, ME)).toBe(null);
+    expect(matchedScope([theirs[0]!, mine[0]!], grid, ME)).toBe(null);
+  });
+
+  it("calls a full selection All even when it is also everyone else's", () => {
+    // A member who has uploaded nothing: the two scopes are the same set, and
+    // the plainer label is the honest one.
+    expect(matchedScope(theirs, theirs, ME)).toBe("all");
+  });
+
+  it("keeps the pills in a fixed order", () => {
+    expect(SELECT_SCOPES.map((s) => s.value)).toEqual(["all", "others", "none"]);
   });
 });

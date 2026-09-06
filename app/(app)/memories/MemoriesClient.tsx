@@ -13,6 +13,13 @@ import { useToast } from "@/components/ui/Toast";
 import { deleteMemory, toggleFavorite } from "./actions";
 import { Check, HeartGlyph, PlayGlyph } from "@/components/ui/icons";
 import { Lightbox } from "@/components/memories/Lightbox";
+import {
+  canSkipOwn,
+  matchedScope,
+  partitionByUploader,
+  scopeMemories,
+  SELECT_SCOPES,
+} from "@/lib/memorySelection";
 import { placeholderLabel } from "@/lib/memoryStatus";
 import { supportsFileSharing, uploadMedia } from "@/lib/uploads/browser";
 
@@ -98,6 +105,8 @@ export function MemoriesClient({
    * and go as the page refreshes underneath.
    */
   const [selectedIds, setSelectedIds] = useState<Set<string> | null>(null);
+  /** The variant waiting on "these are yours — still want them?". */
+  const [pendingDownload, setPendingDownload] = useState<DownloadVariant | null>(null);
   const longPress = useRef<number | null>(null);
   const longPressFrom = useRef<{ x: number; y: number } | null>(null);
   // A long press ends in a click on whatever is under the finger by then —
@@ -107,12 +116,18 @@ export function MemoriesClient({
 
   const beginSelecting = useCallback((firstId?: string) => {
     setLightboxId(null);
+    setPendingDownload(null);
     setSelectedIds(new Set(firstId ? [firstId] : []));
   }, []);
 
-  const stopSelecting = useCallback(() => setSelectedIds(null), []);
+  const stopSelecting = useCallback(() => {
+    setPendingDownload(null);
+    setSelectedIds(null);
+  }, []);
 
   const toggleSelected = useCallback((id: string) => {
+    // Changing the selection changes what the question was about.
+    setPendingDownload(null);
     setSelectedIds((current) => {
       if (!current) return current;
       const next = new Set(current);
@@ -374,20 +389,40 @@ export function MemoriesClient({
   const selectedMemories = selectedIds
     ? selectableMemories.filter((m) => selectedIds.has(m.id))
     : [];
-  const allSelected =
-    selectableMemories.length > 0 && selectedMemories.length === selectableMemories.length;
+  const offerSkipOwn = canSkipOwn(selectableMemories, currentMemberId);
+  const activeScope = selectedIds
+    ? matchedScope(selectedMemories, selectableMemories, currentMemberId)
+    : null;
+  // Your own uploads inside the current selection — what the confirmation is
+  // about, and what "Skip mine" would drop.
+  const { own: ownSelected, others: othersSelected } = partitionByUploader(
+    selectedMemories,
+    currentMemberId,
+  );
   const selectedBytes = selectedMemories.reduce((total, m) => total + m.originalBytes, 0);
 
   /**
-   * Hand the selection to `/api/memories/download`.
+   * Tapping a download button. Anything of your own in the selection stops
+   * here and asks first — the archive you are about to wait on is largely a
+   * second copy of what is already in your camera roll, and the moment to
+   * find that out is before the download, not after it.
+   */
+  function requestDownload(variant: DownloadVariant) {
+    if (selectedMemories.length === 0) return;
+    if (ownSelected.length > 0) return setPendingDownload(variant);
+    startDownload(variant, selectedMemories);
+  }
+
+  /**
+   * Hand a set of memories to `/api/memories/download`.
    *
    * A submitted form rather than `fetch()`: "select all" is more ids than a
    * URL will carry, and the reply is an archive the browser has to stream
    * straight to disk. Reading it into a Blob first would ask a phone to hold
    * gigabytes of video in memory.
    */
-  function downloadSelected(variant: "original" | "compressed") {
-    if (selectedMemories.length === 0) return;
+  function startDownload(variant: DownloadVariant, memories: MemoryCardData[]) {
+    if (memories.length === 0) return;
 
     const form = document.createElement("form");
     form.method = "POST";
@@ -401,16 +436,12 @@ export function MemoriesClient({
       form.appendChild(input);
     };
     field("variant", variant);
-    for (const memory of selectedMemories) field("id", memory.id);
+    for (const memory of memories) field("id", memory.id);
     document.body.appendChild(form);
     form.submit();
     form.remove();
 
-    toast(
-      selectedMemories.length === 1
-        ? "Downloading…"
-        : `Packing ${selectedMemories.length} memories…`,
-    );
+    toast(memories.length === 1 ? "Downloading…" : `Packing ${memories.length} memories…`);
     stopSelecting();
   }
 
@@ -503,37 +534,61 @@ export function MemoriesClient({
 
       {memories.length > 0 ? (
         <div className="mb-4 flex items-center justify-between gap-3">
-          <div className="inline-flex rounded-full border border-line bg-subtle p-1">
-            {(["all", "favorites"] as const).map((value) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => {
-                  setTab(value);
-                  // A selection made under All would silently keep memories
-                  // the Favorites grid isn't showing.
-                  stopSelecting();
-                }}
-                className={`label rounded-full px-3.5 py-1.5 transition-colors ${
-                  tab === value ? "bg-ink text-paper" : "text-muted"
-                }`}
-              >
-                {value === "all" ? "All" : "Favorites"}
-              </button>
-            ))}
-          </div>
-          {selectableMemories.length > 0 ? (
+          {/* One pill group, two jobs. Filtering the grid is not a question
+              you have mid-selection, so for the duration the same row asks the
+              one that *is* live: how much of this screen do you want. Leaving
+              the tabs out is also what keeps a selection honest — it can only
+              ever mean the memories you can see. */}
+          {selectedIds ? (
+            <div className="inline-flex rounded-full border border-line bg-subtle p-1">
+              {SELECT_SCOPES.filter((scope) => scope.value !== "others" || offerSkipOwn).map(
+                (scope) => (
+                  <button
+                    key={scope.value}
+                    type="button"
+                    onClick={() => {
+                      setPendingDownload(null);
+                      setSelectedIds(
+                        new Set(
+                          scopeMemories(selectableMemories, scope.value, currentMemberId).map(
+                            (m) => m.id,
+                          ),
+                        ),
+                      );
+                    }}
+                    aria-pressed={activeScope === scope.value}
+                    className={`label rounded-full px-3 py-1.5 transition-colors ${
+                      activeScope === scope.value ? "bg-ink text-paper" : "text-muted"
+                    }`}
+                  >
+                    {scope.label}
+                  </button>
+                ),
+              )}
+            </div>
+          ) : (
+            <div className="inline-flex rounded-full border border-line bg-subtle p-1">
+              {(["all", "favorites"] as const).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setTab(value)}
+                  className={`label rounded-full px-3.5 py-1.5 transition-colors ${
+                    tab === value ? "bg-ink text-paper" : "text-muted"
+                  }`}
+                >
+                  {value === "all" ? "All" : "Favorites"}
+                </button>
+              ))}
+            </div>
+          )}
+          {!selectedIds && selectableMemories.length > 0 ? (
             <button
               type="button"
-              onClick={() => {
-                if (!selectedIds) return beginSelecting();
-                setSelectedIds(
-                  allSelected ? new Set() : new Set(selectableMemories.map((m) => m.id)),
-                );
-              }}
+              onClick={() => beginSelecting()}
               className="tap -mr-2 shrink-0 px-2 text-xs font-extrabold tracking-tight text-ink"
             >
-              {!selectedIds ? "Select" : allSelected ? "Clear" : "Select all"}
+              Select
             </button>
           ) : null}
         </div>
@@ -674,42 +729,75 @@ export function MemoriesClient({
           <div className="mx-auto max-w-3xl px-4 py-3 safe-bottom">
             <div className="mb-2.5 flex items-center justify-between gap-3">
               <span className="label text-muted">
-                {selectedMemories.length === 0
-                  ? "Nothing selected"
-                  : `${selectedMemories.length} selected`}
+                {pendingDownload
+                  ? `${ownSelected.length} of these ${ownSelected.length === 1 ? "is" : "are"} yours`
+                  : selectedMemories.length === 0
+                    ? "Nothing selected"
+                    : `${selectedMemories.length} selected`}
               </span>
               <button
                 type="button"
-                onClick={stopSelecting}
+                onClick={() => (pendingDownload ? setPendingDownload(null) : stopSelecting())}
                 className="tap -mr-2 px-2 text-xs font-extrabold tracking-tight text-muted"
               >
-                Cancel
+                {pendingDownload ? "Back" : "Cancel"}
               </button>
             </div>
-            <div className="flex gap-2">
-              {/* The originals are the copies this app treats as sacred, so
-                  they lead — with their weight attached, because on a phone
-                  that number is the whole decision. */}
-              <button
-                type="button"
-                disabled={selectedMemories.length === 0}
-                onClick={() => downloadSelected("original")}
-                className="tap flex-1 rounded-xl bg-ink px-4 py-3 text-xs font-extrabold tracking-tight text-paper transition active:scale-[0.99] disabled:opacity-30"
-              >
-                Originals
-                {selectedBytes > 0 ? (
-                  <span className="font-bold opacity-60"> · {formatBytes(selectedBytes)}</span>
+            {pendingDownload ? (
+              <div className="flex gap-2">
+                {/* Skipping leads, because it is nearly always the right
+                    answer — but only where it would leave something to
+                    download. A selection of nothing but your own uploads is a
+                    plain "are you sure", not a choice between two sets. */}
+                {othersSelected.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => startDownload(pendingDownload, othersSelected)}
+                    className="tap flex-1 rounded-xl bg-ink px-4 py-3 text-xs font-extrabold tracking-tight text-paper transition active:scale-[0.99]"
+                  >
+                    Skip mine
+                    <span className="font-bold opacity-60"> · {othersSelected.length}</span>
+                  </button>
                 ) : null}
-              </button>
-              <button
-                type="button"
-                disabled={selectedMemories.length === 0}
-                onClick={() => downloadSelected("compressed")}
-                className="tap flex-1 rounded-xl border border-line-strong px-4 py-3 text-xs font-extrabold tracking-tight text-ink transition active:scale-[0.99] disabled:opacity-30"
-              >
-                Compressed
-              </button>
-            </div>
+                <button
+                  type="button"
+                  onClick={() => startDownload(pendingDownload, selectedMemories)}
+                  className={`tap flex-1 rounded-xl px-4 py-3 text-xs font-extrabold tracking-tight transition active:scale-[0.99] ${
+                    othersSelected.length > 0
+                      ? "border border-line-strong text-ink"
+                      : "bg-ink text-paper"
+                  }`}
+                >
+                  {othersSelected.length > 0 ? "Download all" : "Download anyway"}
+                  <span className="font-bold opacity-60"> · {selectedMemories.length}</span>
+                </button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                {/* The originals are the copies this app treats as sacred, so
+                    they lead — with their weight attached, because on a phone
+                    that number is the whole decision. */}
+                <button
+                  type="button"
+                  disabled={selectedMemories.length === 0}
+                  onClick={() => requestDownload("original")}
+                  className="tap flex-1 rounded-xl bg-ink px-4 py-3 text-xs font-extrabold tracking-tight text-paper transition active:scale-[0.99] disabled:opacity-30"
+                >
+                  Originals
+                  {selectedBytes > 0 ? (
+                    <span className="font-bold opacity-60"> · {formatBytes(selectedBytes)}</span>
+                  ) : null}
+                </button>
+                <button
+                  type="button"
+                  disabled={selectedMemories.length === 0}
+                  onClick={() => requestDownload("compressed")}
+                  className="tap flex-1 rounded-xl border border-line-strong px-4 py-3 text-xs font-extrabold tracking-tight text-ink transition active:scale-[0.99] disabled:opacity-30"
+                >
+                  Compressed
+                </button>
+              </div>
+            )}
           </div>
         </div>
       ) : null}
@@ -815,6 +903,8 @@ const subscribeNever = () => () => {};
 
 /** How long a tile has to be held before the grid turns into a picker. */
 const LONG_PRESS_MS = 450;
+
+type DownloadVariant = "original" | "compressed";
 
 /** Why a bulk download bounced back — see the route's `back()`. */
 const DOWNLOAD_ERRORS: Record<string, string> = {

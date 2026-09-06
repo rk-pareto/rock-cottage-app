@@ -249,9 +249,29 @@ or Nixpacks change (`FFMPEG_PATH` / `FFPROBE_PATH` override them).
 ### Selecting and downloading in bulk
 
 Hold any tile — or tap **Select** beside the All/Favorites tabs — and the grid
-becomes a picker: a checkbox per tile, **Select all**, and a bar that takes the
-bottom nav's place while it lasts. Selection follows the tab, so "select all"
-under Favorites means the favorites.
+becomes a picker: a checkbox per tile and a bar that takes the bottom nav's
+place while it lasts. Selection follows the tab, so a select-all under
+Favorites means the favorites.
+
+The tabs themselves become the scope pills for the duration — **All**, **Not
+mine**, **None** — since filtering the grid isn't a live question mid-selection,
+and putting them away is what keeps a selection honest: it can only ever mean
+the memories you can see. *Not mine* is the one people
+want at the end of a week: your own uploads are already in your camera roll,
+and for a week of 4K clips they are most of the archive. It only appears when
+it would mean something different — with none of your own on screen it is
+*All* under another name, and with nothing but your own it selects nothing.
+
+Belt and braces on the same point: a download whose selection still contains
+your own uploads stops and asks, offering **Skip mine** beside **Download
+all** — the moment to find out you are re-fetching your own photos is before
+the wait, not after it. Where the selection is *nothing but* your own, there
+are no two sets to choose between, so it is a plain "download anyway".
+
+The rules live in `lib/memorySelection.ts`, pure and tested in
+`tests/unit.test.ts` — an "all" that quietly means all-but-one, or a "not mine"
+that matches when you've uploaded nothing, is exactly the sort of off-by-one
+that goes unnoticed.
 
 Two ways out, matching what the viewer offers for a single memory:
 
